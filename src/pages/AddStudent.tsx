@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AlertCircle, Camera, Check, Fingerprint, Save, Search, Upload, User, UserPlus } from 'lucide-react';
+import { AlertCircle, Camera, Check, Fingerprint, Save, Search, Upload, User, UserPlus, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import { toast } from 'sonner';

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BadgeCheck, Clock, ExternalLink, FingerPrint, Search, ShieldCheck, User } from 'lucide-react';
+import { BadgeCheck, Clock, ExternalLink, Fingerprint, Search, ShieldCheck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import BiometricModal from '@/components/BiometricModal';
