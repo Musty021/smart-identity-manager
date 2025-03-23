@@ -1,24 +1,18 @@
+
 import React, { useState } from 'react';
 import { BadgeCheck, Clock, ExternalLink, Fingerprint, Search, ShieldCheck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import BiometricModal from '@/components/BiometricModal';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-
-const mockStudentsDatabase = [
-  { id: 1, name: 'Ahmed Ibrahim', regNumber: 'FUD/19/COM/1001', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=1' },
-  { id: 2, name: 'Fatima Mohammed', regNumber: 'FUD/19/COM/1002', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=5' },
-  { id: 3, name: 'Abubakar Sani', regNumber: 'FUD/19/COM/1003', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=3' },
-  { id: 4, name: 'Zainab Yusuf', regNumber: 'FUD/19/COM/1004', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=9' },
-  { id: 5, name: 'Ibrahim Hassan', regNumber: 'FUD/19/COM/1005', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=2' },
-];
+import { biometricService } from '@/services/biometricService';
 
 const VerifyMe = () => {
   const [showBiometricModal, setShowBiometricModal] = useState(false);
   const [regNumber, setRegNumber] = useState('');
   const [searchClicked, setSearchClicked] = useState(false);
   const [foundStudent, setFoundStudent] = useState<{
+    id?: string;
     name: string;
     regNumber: string;
     level: string;
@@ -28,6 +22,7 @@ const VerifyMe = () => {
   const [isVerified, setIsVerified] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<'face' | 'fingerprint' | null>(null);
   const [verificationTime, setVerificationTime] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async () => {
     if (!regNumber) {
@@ -36,30 +31,26 @@ const VerifyMe = () => {
     }
     
     setSearchClicked(true);
+    setIsSearching(true);
     
     try {
-      const { data: studentData, error: studentError } = await supabase
-        .from('fud_students')
-        .select('id, name, reg_number, level, department')
-        .eq('reg_number', regNumber)
-        .single();
-      
-      if (studentError) {
-        throw studentError;
-      }
+      // Get student by registration number using biometric service
+      const studentData = await biometricService.getStudentByRegNumber(regNumber);
       
       if (studentData) {
-        const { data: biometricData, error: biometricError } = await supabase
-          .from('student_biometrics')
-          .select('has_face, has_fingerprint, face_image_url')
-          .eq('student_id', studentData.id)
-          .single();
-          
-        if (biometricError && biometricError.code !== 'PGRST116') {
-          throw biometricError;
+        // Get student biometric data
+        const biometricData = await biometricService.getStudentBiometrics(studentData.id);
+        
+        if (!biometricData || (!biometricData.has_face && !biometricData.has_fingerprint)) {
+          toast.error('Biometric data not found for this student', {
+            description: 'Student exists but has no biometric data registered'
+          });
+          setFoundStudent(null);
+          return;
         }
         
         setFoundStudent({
+          id: studentData.id,
           name: studentData.name,
           regNumber: studentData.reg_number,
           level: studentData.level,
@@ -67,13 +58,8 @@ const VerifyMe = () => {
           photo: biometricData?.face_image_url || 'https://i.pravatar.cc/150?img=1'
         });
         
-        if (biometricData && (biometricData.has_face || biometricData.has_fingerprint)) {
-          setShowBiometricModal(true);
-        } else {
-          toast.error('Biometric data not found for this student', {
-            description: 'Student exists but has no biometric data registered'
-          });
-        }
+        // Show biometric verification modal
+        setShowBiometricModal(true);
       } else {
         setFoundStudent(null);
         toast.error('Student not found', {
@@ -86,10 +72,12 @@ const VerifyMe = () => {
       toast.error('Error searching for student', {
         description: 'An error occurred while searching. Please try again.'
       });
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const handleVerificationSuccess = (method: 'face' | 'fingerprint') => {
+  const handleVerificationSuccess = (method: 'face' | 'fingerprint', studentId?: string) => {
     setShowBiometricModal(false);
     setIsVerified(true);
     setVerificationMethod(method);
@@ -137,13 +125,24 @@ const VerifyMe = () => {
                   value={regNumber}
                   onChange={(e) => setRegNumber(e.target.value)}
                   className="input-style flex-1"
+                  disabled={isSearching}
                 />
                 <Button 
                   onClick={handleSearch}
                   className="bg-fud-green hover:bg-fud-green-dark text-white px-4"
+                  disabled={isSearching}
                 >
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
+                  {isSearching ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Search
+                    </>
+                  )}
                 </Button>
               </div>
               <p className="text-sm text-gray-500 mt-2">
@@ -151,7 +150,7 @@ const VerifyMe = () => {
               </p>
             </div>
             
-            {searchClicked && !foundStudent && (
+            {searchClicked && !foundStudent && !isSearching && (
               <div className="p-4 rounded-lg bg-red-50 border border-red-100 mb-6">
                 <p className="text-red-700 font-medium">
                   No student found with the provided registration number.
@@ -385,7 +384,7 @@ const VerifyMe = () => {
         <div className="mt-10 p-6 rounded-xl bg-fud-navy/5 border border-fud-navy/10">
           <h3 className="text-lg font-semibold text-fud-navy mb-3">About VerifyMe</h3>
           <p className="text-gray-600 mb-4">
-            VerifyMe provides quick identity verification for students across various campus facilities. The system ensures that only authorized individuals gain access to university services, enhancing security and preventing fraud.
+            VerifyMe provides quick identity verification for students across various campus facilities using AWS Rekognition for facial recognition. The system ensures that only authorized individuals gain access to university services, enhancing security and preventing fraud.
           </p>
           <div className="grid md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-lg shadow-sm">

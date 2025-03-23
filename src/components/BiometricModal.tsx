@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useCallback } from 'react';
 import { 
   Fingerprint, 
   Scan, 
@@ -7,12 +8,13 @@ import {
   Loader2 
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { biometricService } from '@/services/biometricService';
+import WebcamCapture from './WebcamCapture';
 
 interface BiometricModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (method: 'face' | 'fingerprint') => void;
+  onSuccess: (method: 'face' | 'fingerprint', studentId?: string) => void;
   title?: string;
   description?: string;
 }
@@ -25,39 +27,84 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
   description = "Please verify your identity using one of the following methods:"
 }) => {
   const [verifying, setVerifying] = useState<'face' | 'fingerprint' | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  const [faceImageData, setFaceImageData] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const simulateVerification = async (method: 'face' | 'fingerprint') => {
-    setVerifying(method);
-    setStatus('loading');
+  const handleFaceCapture = useCallback(async (imageSrc: string) => {
+    setFaceImageData(imageSrc);
+    setStatus('processing');
     
-    // In a real implementation, you would:
-    // 1. Capture a new biometric sample (face image or fingerprint)
-    // 2. Send it to a server that has the SourceAFIS library to compare with stored templates
-    // 3. Get back a match score and make a decision
-    
-    // For demo purposes, we'll simulate this process with a timeout and random success rate
-    setTimeout(() => {
-      // For demo purposes, let's assume 80% success rate
-      const isSuccess = Math.random() > 0.2;
+    try {
+      const result = await biometricService.verifyFace(imageSrc);
       
-      if (isSuccess) {
+      if (result.isMatch) {
+        setConfidenceScore(result.confidence || null);
         setStatus('success');
         setTimeout(() => {
-          onSuccess(method);
+          onSuccess('face', result.student?.id);
         }, 1500);
       } else {
         setStatus('error');
-        toast.error('Verification failed. Please try again.');
+        setErrorMessage('Face verification failed. Your face does not match any registered faces in our system.');
+        toast.error('Verification failed. Face not recognized.');
       }
-    }, 2500);
+    } catch (error) {
+      console.error('Face verification error:', error);
+      setStatus('error');
+      setErrorMessage('An error occurred during face verification. Please try again.');
+      toast.error('Verification error. Please try again.');
+    }
+  }, [onSuccess]);
+
+  const handleFingerprintVerification = async () => {
+    setVerifying('fingerprint');
+    setStatus('processing');
+    
+    // In a real implementation, you would:
+    // 1. Capture a fingerprint using a fingerprint scanner
+    // 2. Convert the capture to a template
+    // 3. Send the template to the server for verification
+    
+    // For demo purposes, we'll simulate this process
+    try {
+      // Simulate fingerprint capturing and processing
+      setTimeout(async () => {
+        const isSuccess = Math.random() > 0.2; // 80% success rate for demo
+        
+        if (isSuccess) {
+          setStatus('success');
+          setTimeout(() => {
+            onSuccess('fingerprint');
+          }, 1500);
+        } else {
+          setStatus('error');
+          setErrorMessage('Fingerprint verification failed. Please try again or use an alternative method.');
+          toast.error('Verification failed. Fingerprint not recognized.');
+        }
+      }, 2500);
+    } catch (error) {
+      console.error('Fingerprint verification error:', error);
+      setStatus('error');
+      setErrorMessage('An error occurred during fingerprint verification. Please try again.');
+      toast.error('Verification error. Please try again.');
+    }
   };
 
   const resetState = () => {
     setVerifying(null);
     setStatus('idle');
+    setErrorMessage(null);
+    setConfidenceScore(null);
+    setFaceImageData(null);
+  };
+
+  const startFaceVerification = () => {
+    setVerifying('face');
+    setStatus('capturing');
   };
 
   return (
@@ -65,7 +112,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
         onClick={() => {
-          if (status !== 'loading') {
+          if (status !== 'processing') {
             resetState();
             onClose();
           }
@@ -81,7 +128,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
         {status === 'idle' && (
           <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={() => simulateVerification('face')}
+              onClick={startFaceVerification}
               className="flex flex-col items-center justify-center p-6 rounded-xl border border-gray-200 hover:border-fud-green hover:bg-fud-green/5 transition-colors"
             >
               <Scan className="h-8 w-8 text-fud-green mb-3" />
@@ -89,7 +136,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
             </button>
             
             <button
-              onClick={() => simulateVerification('fingerprint')}
+              onClick={handleFingerprintVerification}
               className="flex flex-col items-center justify-center p-6 rounded-xl border border-gray-200 hover:border-fud-green hover:bg-fud-green/5 transition-colors"
             >
               <Fingerprint className="h-8 w-8 text-fud-green mb-3" />
@@ -98,10 +145,25 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
           </div>
         )}
 
-        {status !== 'idle' && (
+        {status === 'capturing' && verifying === 'face' && (
+          <div className="flex flex-col items-center">
+            <h4 className="text-lg font-medium mb-4">Face Verification</h4>
+            <WebcamCapture
+              onCapture={handleFaceCapture}
+              onCancel={() => resetState()}
+              width={400}
+              height={300}
+            />
+            <p className="text-sm text-gray-600 mt-4">
+              Position your face within the frame and ensure good lighting
+            </p>
+          </div>
+        )}
+
+        {(status === 'processing' || status === 'success' || status === 'error') && (
           <div className="flex flex-col items-center justify-center py-8">
             <div className="mb-6">
-              {status === 'loading' && (
+              {status === 'processing' && (
                 <div className="relative">
                   {verifying === 'face' ? (
                     <Scan className="h-16 w-16 text-fud-green" />
@@ -128,16 +190,22 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
             </div>
             
             <h4 className="text-lg font-medium mb-1">
-              {status === 'loading' && 'Verifying...'}
+              {status === 'processing' && 'Verifying...'}
               {status === 'success' && 'Verification Successful'}
               {status === 'error' && 'Verification Failed'}
             </h4>
             
-            <p className="text-sm text-gray-600 mb-6">
-              {status === 'loading' && `Using ${verifying === 'face' ? 'Face ID' : 'Fingerprint'} for verification`}
+            <p className="text-sm text-gray-600 mb-2">
+              {status === 'processing' && `Using ${verifying === 'face' ? 'Face ID' : 'Fingerprint'} for verification`}
               {status === 'success' && 'Your identity has been verified'}
-              {status === 'error' && 'Please try again or use an alternative method'}
+              {status === 'error' && errorMessage}
             </p>
+
+            {confidenceScore !== null && (
+              <p className="text-sm font-medium text-fud-green mb-6">
+                Match confidence: {confidenceScore.toFixed(1)}%
+              </p>
+            )}
 
             {status === 'error' && (
               <div className="flex gap-3">

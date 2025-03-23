@@ -1,0 +1,15 @@
+
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": true
+  },
+  "lint": {
+    "include": ["**/*.ts"]
+  },
+  "fmt": {
+    "include": ["**/*.ts"],
+    "indentWidth": 2,
+    "lineWidth": 100
+  }
+}

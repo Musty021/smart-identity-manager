@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { biometricService } from '@/services/biometricService';
+import WebcamCapture from '@/components/WebcamCapture';
 
 const AddStudent = () => {
   const [regNumber, setRegNumber] = useState('');
@@ -19,6 +21,7 @@ const AddStudent = () => {
   
   const [step, setStep] = useState(1);
   const [faceImageCaptured, setFaceImageCaptured] = useState(false);
+  const [showWebcam, setShowWebcam] = useState(false);
   const [fingerprintCaptured, setFingerprintCaptured] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -39,31 +42,10 @@ const AddStudent = () => {
     setIsProcessing(true);
     
     try {
-      const { data: studentData, error: studentError } = await supabase
-        .from('fud_students')
-        .select('id, name, reg_number, level, department')
-        .eq('reg_number', regNumber)
-        .single();
+      const studentData = await biometricService.getStudentByRegNumber(regNumber);
       
-      if (studentError) {
-        if (studentError.code === 'PGRST116') {
-          setFoundStudent(null);
-          toast.error('Student not found', {
-            description: 'No student with this registration number exists in our records'
-          });
-        } else {
-          throw studentError;
-        }
-      } else if (studentData) {
-        const { data: biometricData, error: biometricError } = await supabase
-          .from('student_biometrics')
-          .select('has_face, has_fingerprint')
-          .eq('student_id', studentData.id)
-          .maybeSingle();
-        
-        if (biometricError && biometricError.code !== 'PGRST116') {
-          throw biometricError;
-        }
+      if (studentData) {
+        const biometricData = await biometricService.getStudentBiometrics(studentData.id);
         
         const hasBiometrics = biometricData && (biometricData.has_face || biometricData.has_fingerprint);
         
@@ -81,21 +63,17 @@ const AddStudent = () => {
       toast.error('Error searching for student', {
         description: 'An error occurred while searching. Please try again.'
       });
+      setFoundStudent(null);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleCaptureFace = () => {
-    setIsProcessing(true);
-    
-    setTimeout(() => {
-      const mockImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-      setFaceImageData(mockImageData);
-      setFaceImageCaptured(true);
-      setIsProcessing(false);
-      toast.success('Face image captured successfully');
-    }, 1500);
+  const handleFaceCapture = (imageSrc: string) => {
+    setFaceImageData(imageSrc);
+    setFaceImageCaptured(true);
+    setShowWebcam(false);
+    toast.success('Face image captured successfully');
   };
 
   const handleCaptureFingerprint = () => {
@@ -134,67 +112,13 @@ const AddStudent = () => {
     setIsProcessing(true);
     
     try {
-      let faceImageUrl = null;
-      
-      if (faceImageData) {
-        const base64Response = await fetch(faceImageData);
-        const blob = await base64Response.blob();
-        
-        const fileExt = 'png';
-        const fileName = `${foundStudent.id}_face.${fileExt}`;
-        const filePath = `${foundStudent.id}/${fileName}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('biometrics')
-          .upload(filePath, blob, {
-            contentType: 'image/png',
-            upsert: true
-          });
-        
-        if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('biometrics')
-          .getPublicUrl(filePath);
-        
-        faceImageUrl = publicUrl;
-      }
-      
-      const biometricData = {
+      await biometricService.addBiometricData({
         student_id: foundStudent.id,
-        face_image_url: faceImageUrl,
-        fingerprint_template: fingerprintData ? Array.from(new Uint8Array(fingerprintData)) : null,
+        face_image_data: faceImageData,
+        fingerprint_template: fingerprintData,
         has_face: faceImageCaptured,
-        has_fingerprint: fingerprintCaptured,
-        updated_at: new Date().toISOString()
-      };
-      
-      const { data: existingRecord, error: checkError } = await supabase
-        .from('student_biometrics')
-        .select('id')
-        .eq('student_id', foundStudent.id)
-        .maybeSingle();
-      
-      if (checkError && checkError.code !== 'PGRST116') throw checkError;
-      
-      let upsertError;
-      
-      if (existingRecord) {
-        const { error } = await supabase
-          .from('student_biometrics')
-          .update(biometricData)
-          .eq('student_id', foundStudent.id);
-        
-        upsertError = error;
-      } else {
-        const { error } = await supabase
-          .from('student_biometrics')
-          .insert(biometricData);
-        
-        upsertError = error;
-      }
-      
-      if (upsertError) throw upsertError;
+        has_fingerprint: fingerprintCaptured
+      });
       
       setIsComplete(true);
       toast.success('Student biometrics added successfully', {
@@ -220,6 +144,7 @@ const AddStudent = () => {
     setIsComplete(false);
     setFaceImageData(null);
     setFingerprintData(null);
+    setShowWebcam(false);
   };
 
   return (
@@ -255,9 +180,13 @@ const AddStudent = () => {
                 <Button 
                   onClick={handleSearch}
                   className="bg-fud-green hover:bg-fud-green-dark text-white px-4"
-                  disabled={foundStudent && !foundStudent.hasBiometrics}
+                  disabled={foundStudent && !foundStudent.hasBiometrics || isProcessing}
                 >
-                  <Search className="h-4 w-4 mr-2" />
+                  {isProcessing ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  ) : (
+                    <Search className="h-4 w-4 mr-2" />
+                  )}
                   Search
                 </Button>
               </div>
@@ -390,35 +319,40 @@ const AddStudent = () => {
                   
                   <div className="flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 mb-6">
                     {!faceImageCaptured ? (
-                      <>
-                        <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mb-4">
-                          <Camera className="h-10 w-10 text-gray-400" />
-                        </div>
-                        <p className="text-gray-600 text-center mb-6 max-w-md">
-                          Position the student's face in a well-lit environment for optimal image quality
-                        </p>
-                        <Button 
-                          onClick={handleCaptureFace}
-                          className="bg-fud-green hover:bg-fud-green-dark text-white"
-                          disabled={isProcessing}
-                        >
-                          {isProcessing ? (
-                            <>
-                              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                              Processing...
-                            </>
-                          ) : (
-                            <>
-                              <Camera className="h-4 w-4 mr-2" />
-                              Capture Face Image
-                            </>
-                          )}
-                        </Button>
-                      </>
+                      showWebcam ? (
+                        <WebcamCapture
+                          onCapture={handleFaceCapture}
+                          onCancel={() => setShowWebcam(false)}
+                        />
+                      ) : (
+                        <>
+                          <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mb-4">
+                            <Camera className="h-10 w-10 text-gray-400" />
+                          </div>
+                          <p className="text-gray-600 text-center mb-6 max-w-md">
+                            Position the student's face in a well-lit environment for optimal image quality
+                          </p>
+                          <Button 
+                            onClick={() => setShowWebcam(true)}
+                            className="bg-fud-green hover:bg-fud-green-dark text-white"
+                          >
+                            <Camera className="h-4 w-4 mr-2" />
+                            Open Camera
+                          </Button>
+                        </>
+                      )
                     ) : (
                       <div className="text-center">
-                        <div className="w-32 h-32 rounded-full bg-green-100 border-4 border-green-200 flex items-center justify-center mb-4 mx-auto">
-                          <Check className="h-12 w-12 text-green-500" />
+                        <div className="w-32 h-32 mb-4 mx-auto relative">
+                          <img 
+                            src={faceImageData!} 
+                            alt="Captured face" 
+                            className="w-full h-full object-cover rounded-full border-4 border-green-200"
+                            style={{ transform: 'scaleX(-1)' }} // Mirror for consistency
+                          />
+                          <div className="absolute bottom-0 right-0 bg-green-100 rounded-full p-1 border-2 border-white">
+                            <Check className="h-5 w-5 text-green-600" />
+                          </div>
                         </div>
                         <h4 className="text-lg font-medium text-green-700 mb-1">Face Image Captured</h4>
                         <p className="text-gray-600 mb-4">
@@ -426,7 +360,11 @@ const AddStudent = () => {
                         </p>
                         <Button
                           variant="outline"
-                          onClick={() => setFaceImageCaptured(false)}
+                          onClick={() => {
+                            setFaceImageCaptured(false);
+                            setFaceImageData(null);
+                            setShowWebcam(true);
+                          }}
                           className="text-fud-green border-fud-green hover:bg-fud-green/10"
                         >
                           Retake Image
@@ -490,7 +428,7 @@ const AddStudent = () => {
                     ) : (
                       <div className="text-center">
                         <div className="w-32 h-32 rounded-full bg-green-100 border-4 border-green-200 flex items-center justify-center mb-4 mx-auto">
-                          <Check className="h-12 w-12 text-green-500" />
+                          <Fingerprint className="h-12 w-12 text-green-600" />
                         </div>
                         <h4 className="text-lg font-medium text-green-700 mb-1">Fingerprint Captured</h4>
                         <p className="text-gray-600 mb-4">
@@ -658,7 +596,7 @@ const AddStudent = () => {
                 <h4 className="font-medium text-fud-navy">Face ID Process</h4>
               </div>
               <p className="text-sm text-gray-600">
-                Captures and processes facial features for secure identity recognition using advanced facial recognition algorithms.
+                Captures and processes facial features using AWS Rekognition for secure identity recognition with advanced facial recognition algorithms.
               </p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -691,3 +629,4 @@ const AddStudent = () => {
 };
 
 export default AddStudent;
+
