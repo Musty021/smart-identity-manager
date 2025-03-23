@@ -1,23 +1,15 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, Camera, Check, Fingerprint, Save, Search, Upload, User, UserPlus, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import { toast } from 'sonner';
-
-// Mock student data for demonstration
-const mockStudentsDatabase = [
-  { id: 1, name: 'Mohammed Ali', regNumber: 'FUD/20/COM/1010', level: '300', department: 'Computer Science', hasBiometrics: false },
-  { id: 2, name: 'Aisha Bello', regNumber: 'FUD/20/COM/1011', level: '300', department: 'Computer Science', hasBiometrics: false },
-  { id: 3, name: 'Usman Garba', regNumber: 'FUD/20/COM/1012', level: '300', department: 'Computer Science', hasBiometrics: true },
-  { id: 4, name: 'Hadiza Ibrahim', regNumber: 'FUD/20/COM/1013', level: '300', department: 'Computer Science', hasBiometrics: false },
-  { id: 5, name: 'Yusuf Musa', regNumber: 'FUD/20/COM/1014', level: '300', department: 'Computer Science', hasBiometrics: true },
-];
+import { supabase } from '@/integrations/supabase/client';
 
 const AddStudent = () => {
   const [regNumber, setRegNumber] = useState('');
   const [searchClicked, setSearchClicked] = useState(false);
   const [foundStudent, setFoundStudent] = useState<{
+    id: string;
     name: string;
     regNumber: string;
     level: string;
@@ -30,37 +22,76 @@ const AddStudent = () => {
   const [fingerprintCaptured, setFingerprintCaptured] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [faceImageData, setFaceImageData] = useState<string | null>(null);
+  const [fingerprintData, setFingerprintData] = useState<ArrayBuffer | null>(null);
 
-  const handleSearch = () => {
+  useEffect(() => {
+    handleReset();
+  }, []);
+
+  const handleSearch = async () => {
     if (!regNumber) {
       toast.error('Please enter a registration number');
       return;
     }
     
     setSearchClicked(true);
-    const student = mockStudentsDatabase.find(s => s.regNumber === regNumber);
+    setIsProcessing(true);
     
-    if (student) {
-      setFoundStudent({
-        name: student.name,
-        regNumber: student.regNumber,
-        level: student.level,
-        department: student.department,
-        hasBiometrics: student.hasBiometrics
+    try {
+      const { data: studentData, error: studentError } = await supabase
+        .from('fud_students')
+        .select('id, name, reg_number, level, department')
+        .eq('reg_number', regNumber)
+        .single();
+      
+      if (studentError) {
+        if (studentError.code === 'PGRST116') {
+          setFoundStudent(null);
+          toast.error('Student not found', {
+            description: 'No student with this registration number exists in our records'
+          });
+        } else {
+          throw studentError;
+        }
+      } else if (studentData) {
+        const { data: biometricData, error: biometricError } = await supabase
+          .from('student_biometrics')
+          .select('has_face, has_fingerprint')
+          .eq('student_id', studentData.id)
+          .maybeSingle();
+        
+        if (biometricError && biometricError.code !== 'PGRST116') {
+          throw biometricError;
+        }
+        
+        const hasBiometrics = biometricData && (biometricData.has_face || biometricData.has_fingerprint);
+        
+        setFoundStudent({
+          id: studentData.id,
+          name: studentData.name,
+          regNumber: studentData.reg_number,
+          level: studentData.level,
+          department: studentData.department,
+          hasBiometrics: !!hasBiometrics
+        });
+      }
+    } catch (error) {
+      console.error('Error searching for student:', error);
+      toast.error('Error searching for student', {
+        description: 'An error occurred while searching. Please try again.'
       });
-    } else {
-      setFoundStudent(null);
-      toast.error('Student not found', {
-        description: 'No student with this registration number exists in our records'
-      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleCaptureFace = () => {
     setIsProcessing(true);
     
-    // Simulate face capture process
     setTimeout(() => {
+      const mockImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      setFaceImageData(mockImageData);
       setFaceImageCaptured(true);
       setIsProcessing(false);
       toast.success('Face image captured successfully');
@@ -70,8 +101,9 @@ const AddStudent = () => {
   const handleCaptureFingerprint = () => {
     setIsProcessing(true);
     
-    // Simulate fingerprint capture process
     setTimeout(() => {
+      const mockFingerprintData = new ArrayBuffer(50);
+      setFingerprintData(mockFingerprintData);
       setFingerprintCaptured(true);
       setIsProcessing(false);
       toast.success('Fingerprint captured successfully');
@@ -92,17 +124,89 @@ const AddStudent = () => {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      // Final submission
-      setIsProcessing(true);
+      handleSubmitBiometrics();
+    }
+  };
+
+  const handleSubmitBiometrics = async () => {
+    if (!foundStudent) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      let faceImageUrl = null;
       
-      // Simulate processing
-      setTimeout(() => {
-        setIsComplete(true);
-        setIsProcessing(false);
-        toast.success('Student biometrics added successfully', {
-          description: 'The student can now use biometric verification for campus services'
-        });
-      }, 2000);
+      if (faceImageData) {
+        const base64Response = await fetch(faceImageData);
+        const blob = await base64Response.blob();
+        
+        const fileExt = 'png';
+        const fileName = `${foundStudent.id}_face.${fileExt}`;
+        const filePath = `${foundStudent.id}/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('biometrics')
+          .upload(filePath, blob, {
+            contentType: 'image/png',
+            upsert: true
+          });
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('biometrics')
+          .getPublicUrl(filePath);
+        
+        faceImageUrl = publicUrl;
+      }
+      
+      const biometricData = {
+        student_id: foundStudent.id,
+        face_image_url: faceImageUrl,
+        fingerprint_template: fingerprintData ? Array.from(new Uint8Array(fingerprintData)) : null,
+        has_face: faceImageCaptured,
+        has_fingerprint: fingerprintCaptured,
+        updated_at: new Date().toISOString()
+      };
+      
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('student_biometrics')
+        .select('id')
+        .eq('student_id', foundStudent.id)
+        .maybeSingle();
+      
+      if (checkError && checkError.code !== 'PGRST116') throw checkError;
+      
+      let upsertError;
+      
+      if (existingRecord) {
+        const { error } = await supabase
+          .from('student_biometrics')
+          .update(biometricData)
+          .eq('student_id', foundStudent.id);
+        
+        upsertError = error;
+      } else {
+        const { error } = await supabase
+          .from('student_biometrics')
+          .insert(biometricData);
+        
+        upsertError = error;
+      }
+      
+      if (upsertError) throw upsertError;
+      
+      setIsComplete(true);
+      toast.success('Student biometrics added successfully', {
+        description: 'The student can now use biometric verification for campus services'
+      });
+    } catch (error) {
+      console.error('Error saving biometric data:', error);
+      toast.error('Error saving biometric data', {
+        description: 'An error occurred while saving. Please try again.'
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -114,6 +218,8 @@ const AddStudent = () => {
     setFaceImageCaptured(false);
     setFingerprintCaptured(false);
     setIsComplete(false);
+    setFaceImageData(null);
+    setFingerprintData(null);
   };
 
   return (
@@ -217,7 +323,7 @@ const AddStudent = () => {
                   </div>
                 </div>
                 
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Biometric Status:</span>
                   <span className="text-amber-600 font-medium">Not Registered</span>
                 </div>

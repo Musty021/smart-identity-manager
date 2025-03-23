@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import BiometricModal from '@/components/BiometricModal';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock student data for demonstration
 const mockStudentsDatabase = [
   { id: 1, name: 'Ahmed Ibrahim', regNumber: 'FUD/19/COM/1001', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=1' },
   { id: 2, name: 'Fatima Mohammed', regNumber: 'FUD/19/COM/1002', level: '400', department: 'Computer Science', photo: 'https://i.pravatar.cc/150?img=5' },
@@ -29,28 +29,62 @@ const VerifyMe = () => {
   const [verificationMethod, setVerificationMethod] = useState<'face' | 'fingerprint' | null>(null);
   const [verificationTime, setVerificationTime] = useState<string | null>(null);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!regNumber) {
       toast.error('Please enter a registration number');
       return;
     }
     
     setSearchClicked(true);
-    const student = mockStudentsDatabase.find(s => s.regNumber === regNumber);
     
-    if (student) {
-      setFoundStudent({
-        name: student.name,
-        regNumber: student.regNumber,
-        level: student.level,
-        department: student.department,
-        photo: student.photo
-      });
-      setShowBiometricModal(true);
-    } else {
+    try {
+      const { data: studentData, error: studentError } = await supabase
+        .from('fud_students')
+        .select('id, name, reg_number, level, department')
+        .eq('reg_number', regNumber)
+        .single();
+      
+      if (studentError) {
+        throw studentError;
+      }
+      
+      if (studentData) {
+        const { data: biometricData, error: biometricError } = await supabase
+          .from('student_biometrics')
+          .select('has_face, has_fingerprint, face_image_url')
+          .eq('student_id', studentData.id)
+          .single();
+          
+        if (biometricError && biometricError.code !== 'PGRST116') {
+          throw biometricError;
+        }
+        
+        setFoundStudent({
+          name: studentData.name,
+          regNumber: studentData.reg_number,
+          level: studentData.level,
+          department: studentData.department,
+          photo: biometricData?.face_image_url || 'https://i.pravatar.cc/150?img=1'
+        });
+        
+        if (biometricData && (biometricData.has_face || biometricData.has_fingerprint)) {
+          setShowBiometricModal(true);
+        } else {
+          toast.error('Biometric data not found for this student', {
+            description: 'Student exists but has no biometric data registered'
+          });
+        }
+      } else {
+        setFoundStudent(null);
+        toast.error('Student not found', {
+          description: 'No student with this registration number exists in our records'
+        });
+      }
+    } catch (error) {
+      console.error('Error searching for student:', error);
       setFoundStudent(null);
-      toast.error('Student not found', {
-        description: 'No student with this registration number exists in our records'
+      toast.error('Error searching for student', {
+        description: 'An error occurred while searching. Please try again.'
       });
     }
   };

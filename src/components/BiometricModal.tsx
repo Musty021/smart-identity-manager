@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Fingerprint, 
@@ -7,8 +6,8 @@ import {
   AlertCircle, 
   Loader2 
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BiometricModalProps {
   isOpen: boolean;
@@ -30,11 +29,16 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
 
   if (!isOpen) return null;
 
-  const simulateVerification = (method: 'face' | 'fingerprint') => {
+  const simulateVerification = async (method: 'face' | 'fingerprint') => {
     setVerifying(method);
     setStatus('loading');
     
-    // Simulate verification process
+    // In a real implementation, you would:
+    // 1. Capture a new biometric sample (face image or fingerprint)
+    // 2. Send it to a server that has the SourceAFIS library to compare with stored templates
+    // 3. Get back a match score and make a decision
+    
+    // For demo purposes, we'll simulate this process with a timeout and random success rate
     setTimeout(() => {
       // For demo purposes, let's assume 80% success rate
       const isSuccess = Math.random() > 0.2;

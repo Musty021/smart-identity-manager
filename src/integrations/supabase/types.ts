@@ -9,7 +9,80 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      fud_students: {
+        Row: {
+          created_at: string | null
+          department: string
+          id: string
+          level: string
+          name: string
+          reg_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          id?: string
+          level: string
+          name: string
+          reg_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          id?: string
+          level?: string
+          name?: string
+          reg_number?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      student_biometrics: {
+        Row: {
+          created_at: string | null
+          face_id: string | null
+          face_image_url: string | null
+          fingerprint_template: string | null
+          has_face: boolean | null
+          has_fingerprint: boolean | null
+          id: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          face_id?: string | null
+          face_image_url?: string | null
+          fingerprint_template?: string | null
+          has_face?: boolean | null
+          has_fingerprint?: boolean | null
+          id?: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          face_id?: string | null
+          face_image_url?: string | null
+          fingerprint_template?: string | null
+          has_face?: boolean | null
+          has_fingerprint?: boolean | null
+          id?: string
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_biometrics_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "fud_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
