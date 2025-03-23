@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { BadgeCheck, Clock, ExternalLink, Fingerprint, Search, ShieldCheck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -244,7 +243,7 @@ const VerifyMe = () => {
                           </>
                         ) : (
                           <>
-                            <FingerPrint className="h-4 w-4" />
+                            <Fingerprint className="h-4 w-4" />
                             Fingerprint
                           </>
                         )}
