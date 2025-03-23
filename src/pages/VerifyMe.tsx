@@ -178,7 +178,7 @@ const VerifyMe = () => {
                       {verificationMethod === 'face' ? (
                         <ShieldCheck className="h-4 w-4 text-green-600" />
                       ) : (
-                        <FingerPrint className="h-4 w-4 text-green-600" />
+                        <Fingerprint className="h-4 w-4 text-green-600" />
                       )}
                       <p className="text-sm font-medium text-green-700">
                         {verificationMethod === 'face' ? 'Face ID' : 'Fingerprint'}

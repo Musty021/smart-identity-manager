@@ -95,12 +95,18 @@ export const biometricService = {
     has_face: boolean;
     has_fingerprint: boolean;
   }) {
-    // Convert ArrayBuffer to a format that can be stored in Supabase
+    // For Supabase, we need to convert fingerprint_template to a string
+    // because bytea in PostgreSQL is represented as a string in JSON
+    const fingerprintString = biometricData.fingerprint_template 
+      ? btoa(String.fromCharCode(...new Uint8Array(biometricData.fingerprint_template)))
+      : null;
+    
     const dataToInsert = {
-      ...biometricData,
-      fingerprint_template: biometricData.fingerprint_template 
-        ? Array.from(new Uint8Array(biometricData.fingerprint_template)) 
-        : null
+      student_id: biometricData.student_id,
+      face_image_url: biometricData.face_image_url,
+      fingerprint_template: fingerprintString,
+      has_face: biometricData.has_face,
+      has_fingerprint: biometricData.has_fingerprint
     };
     
     const { data, error } = await supabase
@@ -123,14 +129,29 @@ export const biometricService = {
     has_face?: boolean;
     has_fingerprint?: boolean;
   }) {
-    // Convert ArrayBuffer to a format that can be stored in Supabase
-    const dataToUpdate = {
-      ...biometricData,
-      fingerprint_template: biometricData.fingerprint_template 
-        ? Array.from(new Uint8Array(biometricData.fingerprint_template)) 
-        : undefined,
+    // For Supabase, we need to handle fingerprint_template conversion
+    const dataToUpdate: Record<string, any> = {
       updated_at: new Date().toISOString()
     };
+    
+    if (biometricData.face_image_url !== undefined) {
+      dataToUpdate.face_image_url = biometricData.face_image_url;
+    }
+    
+    if (biometricData.has_face !== undefined) {
+      dataToUpdate.has_face = biometricData.has_face;
+    }
+    
+    if (biometricData.has_fingerprint !== undefined) {
+      dataToUpdate.has_fingerprint = biometricData.has_fingerprint;
+    }
+    
+    if (biometricData.fingerprint_template) {
+      // Convert ArrayBuffer to Base64 string for storage
+      dataToUpdate.fingerprint_template = btoa(
+        String.fromCharCode(...new Uint8Array(biometricData.fingerprint_template))
+      );
+    }
     
     const { data, error } = await supabase
       .from('student_biometrics')

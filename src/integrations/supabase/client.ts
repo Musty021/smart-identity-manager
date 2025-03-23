@@ -9,15 +9,53 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+// Enhanced options for security and performance
+const supabaseOptions = {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    headers: {
+      'x-application-name': 'FUD Biometric System',
+    },
+  },
+  realtime: {
+    timeout: 30000, // Increased timeout for better reliability
+  },
+};
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL, 
+  SUPABASE_PUBLISHABLE_KEY, 
+  supabaseOptions
+);
+
+// Add logging for debugging
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log(`Supabase auth event: ${event}`, session);
 });
 
 // Storage URL helper
 export const getStorageUrl = (bucket: string, path: string) => {
   return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+};
+
+// Utility for secure biometric data handling
+export const secureBiometricOps = {
+  // Convert ArrayBuffer to string for storage
+  encodeTemplate: (buffer: ArrayBuffer): string => {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  },
+  
+  // Convert stored string back to ArrayBuffer
+  decodeTemplate: (base64String: string): ArrayBuffer => {
+    const binaryString = atob(base64String);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
 };
