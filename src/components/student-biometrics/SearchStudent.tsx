@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AlertCircle, Search, User } from 'lucide-react';
+import { AlertCircle, Check, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { biometricService } from '@/services/biometricService';
