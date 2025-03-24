@@ -36,13 +36,7 @@ const Index = () => {
                     to="/smart-attendance" 
                     className="px-6 py-3 rounded-xl button-gradient text-white font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
                   >
-                    Take Attendance
-                  </Link>
-                  <Link 
-                    to="/verify-me" 
-                    className="px-6 py-3 rounded-xl bg-white border border-gray-200 text-fud-navy font-medium transition-all hover:border-fud-green hover:text-fud-green"
-                  >
-                    Verify Identity
+                    Get Started Now
                   </Link>
                 </div>
               </div>
@@ -206,16 +200,10 @@ const Index = () => {
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <Link 
-                  to="/add-student" 
+                  to="/smart-attendance" 
                   className="px-6 py-3 rounded-xl bg-white text-fud-navy font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
                 >
-                  Register Students
-                </Link>
-                <Link 
-                  to="/smart-attendance" 
-                  className="px-6 py-3 rounded-xl bg-fud-green text-white font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
-                >
-                  Take Attendance
+                  Get Started Now
                 </Link>
               </div>
             </div>

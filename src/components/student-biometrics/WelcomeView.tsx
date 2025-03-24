@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Camera, Fingerprint, UserPlus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const WelcomeView = () => {
   return (
