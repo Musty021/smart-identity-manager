@@ -16,7 +16,7 @@ export type Database = {
           id: string
           level: string
           name: string
-          reg_number: string
+          regNumber: string
           updated_at: string | null
         }
         Insert: {
@@ -25,7 +25,7 @@ export type Database = {
           id?: string
           level: string
           name: string
-          reg_number: string
+          regNumber: string
           updated_at?: string | null
         }
         Update: {
@@ -34,7 +34,7 @@ export type Database = {
           id?: string
           level?: string
           name?: string
-          reg_number?: string
+          regNumber?: string
           updated_at?: string | null
         }
         Relationships: []
