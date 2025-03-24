@@ -1,5 +1,7 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
+import FeatureCard from '@/components/FeatureCard';
 import FadeIn from '@/components/animations/FadeIn';
 import { 
   Calendar, 
