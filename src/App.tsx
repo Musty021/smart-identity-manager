@@ -11,6 +11,7 @@ import ExamPassID from "./pages/ExamPassID";
 import VerifyMe from "./pages/VerifyMe";
 import AddStudent from "./pages/AddStudent";
 import NotFound from "./pages/NotFound";
+import GetStarted from "./pages/GetStarted";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout><Index /></Layout>} />
+          <Route path="/get-started" element={<Layout><GetStarted /></Layout>} />
           <Route path="/smart-attendance" element={<Layout><SmartAttendance /></Layout>} />
           <Route path="/exam-pass" element={<Layout><ExamPassID /></Layout>} />
           <Route path="/verify-me" element={<Layout><VerifyMe /></Layout>} />

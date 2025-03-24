@@ -1,7 +1,5 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
-import FeatureCard from '@/components/FeatureCard';
 import FadeIn from '@/components/animations/FadeIn';
 import { 
   Calendar, 
@@ -33,7 +31,7 @@ const Index = () => {
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <Link 
-                    to="/smart-attendance" 
+                    to="/get-started" 
                     className="px-6 py-3 rounded-xl button-gradient text-white font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
                   >
                     Get Started Now
@@ -72,6 +70,15 @@ const Index = () => {
               </p>
             </div>
           </FadeIn>
+
+          <div className="text-center mb-12">
+            <Link 
+              to="/get-started" 
+              className="px-6 py-3 rounded-xl button-gradient text-white font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
+            >
+              Get Started Now
+            </Link>
+          </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <FeatureCard 
@@ -200,7 +207,7 @@ const Index = () => {
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <Link 
-                  to="/smart-attendance" 
+                  to="/get-started" 
                   className="px-6 py-3 rounded-xl bg-white text-fud-navy font-medium transition-transform hover:shadow-lg hover:-translate-y-0.5"
                 >
                   Get Started Now
