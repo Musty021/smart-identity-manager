@@ -92,7 +92,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
           <input
             id="regNumber"
             type="text"
-            placeholder="e.g. FUD/19/COM/1001"
+            placeholder="FCP/CIT/22/1001"
             value={regNumber}
             onChange={(e) => setRegNumber(e.target.value)}
             className="input-style flex-1"

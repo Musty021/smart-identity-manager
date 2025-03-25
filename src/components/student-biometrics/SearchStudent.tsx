@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AlertCircle, Check, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,7 +82,7 @@ const SearchStudent: React.FC<SearchStudentProps> = ({
           <input
             id="regNumber"
             type="text"
-            placeholder="e.g. FUD/20/COM/1010"
+            placeholder="FCP/CIT/22/1001"
             value={regNumber}
             onChange={(e) => setRegNumber(e.target.value)}
             className="input-style flex-1"
