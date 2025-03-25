@@ -1,11 +1,12 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, X, Image as ImageIcon, RotateCw } from 'lucide-react';
+import { Camera, X, Image as ImageIcon, RotateCw, CameraOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WebcamCaptureProps {
   onCapture: (imageSrc: string) => void;
   onCancel?: () => void;
+  onError?: (errorMessage: string) => void;
   showControls?: boolean;
   width?: number;
   height?: number;
@@ -14,6 +15,7 @@ interface WebcamCaptureProps {
 const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   onCapture,
   onCancel,
+  onError,
   showControls = true,
   width = 480,
   height = 360
@@ -26,6 +28,35 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
+  const [attemptCount, setAttemptCount] = useState(0);
+  const maxAttempts = 3;
+
+  // Handle errors internally and also send to parent if callback provided
+  const handleError = useCallback((errorMessage: string) => {
+    setError(errorMessage);
+    setIsCapturing(false);
+    
+    if (onError) {
+      onError(errorMessage);
+    }
+  }, [onError]);
+
+  // Retry logic with backoff
+  const retryInitializeCamera = useCallback(async (deviceId?: string) => {
+    if (attemptCount >= maxAttempts) {
+      handleError("Maximum retry attempts reached. Please check your camera permissions.");
+      return;
+    }
+
+    // Exponential backoff
+    const backoffTime = Math.pow(2, attemptCount) * 500;
+    await new Promise(resolve => setTimeout(resolve, backoffTime));
+    
+    setAttemptCount(prev => prev + 1);
+    initializeCamera(deviceId).catch(err => {
+      console.error('Retry failed:', err);
+    });
+  }, [attemptCount, handleError]);
 
   // Initialize and get access to the camera
   const initializeCamera = useCallback(async (deviceId?: string) => {
@@ -46,28 +77,59 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
           : { width, height, facingMode: 'user' }
       };
 
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
+      console.log('Requesting camera access with constraints:', constraints);
+      
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        setStream(mediaStream);
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          
+          // Check if the video is actually streaming data
+          videoRef.current.onloadedmetadata = () => {
+            console.log('Video metadata loaded');
+            videoRef.current.play().catch(err => {
+              console.error('Error playing video:', err);
+              handleError('Error starting video stream: ' + err.message);
+            });
+          };
+          
+          videoRef.current.onerror = () => {
+            handleError('Video element encountered an error');
+          };
+        }
 
-      // Get available video devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      setDevices(videoDevices);
+        // Get available video devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log('Available video devices:', videoDevices);
+        setDevices(videoDevices);
 
-      // Set current device ID if not already set
-      if (!currentDeviceId && videoDevices.length > 0) {
-        setCurrentDeviceId(videoDevices[0].deviceId);
+        // Set current device ID if not already set
+        if (!currentDeviceId && videoDevices.length > 0) {
+          setCurrentDeviceId(videoDevices[0].deviceId);
+        }
+        
+        // Reset attempt count on success
+        setAttemptCount(0);
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        
+        // Check if we should retry
+        if (attemptCount < maxAttempts) {
+          console.log(`Retrying camera access (attempt ${attemptCount + 1}/${maxAttempts})...`);
+          retryInitializeCamera(deviceId);
+        } else {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          handleError(`Could not access the camera: ${errorMessage}. Please ensure camera permissions are enabled.`);
+        }
       }
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      setError('Could not access the camera. Please ensure camera permissions are enabled.');
-      setIsCapturing(false);
+      console.error('Error in initializeCamera:', err);
+      handleError('An unexpected error occurred while setting up the camera');
     }
-  }, [width, height, stream, currentDeviceId]);
+  }, [width, height, stream, currentDeviceId, handleError, attemptCount, maxAttempts, retryInitializeCamera]);
 
   // Switch between available cameras
   const switchCamera = useCallback(() => {
@@ -87,6 +149,12 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
       const canvas = canvasRef.current;
       const video = videoRef.current;
       
+      // Make sure video dimensions are valid
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        handleError('Video stream not ready or has zero dimensions');
+        return;
+      }
+      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
@@ -98,7 +166,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
         setIsCapturing(false);
       }
     }
-  }, []);
+  }, [handleError]);
 
   // Retake the photo
   const retakeImage = useCallback(() => {
@@ -116,22 +184,33 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Initialize camera on component mount
   useEffect(() => {
+    console.log('Initializing camera...');
     initializeCamera();
 
     // Clean up on unmount
     return () => {
+      console.log('Cleaning up camera...');
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => {
+          console.log('Stopping track:', track.kind, track.label);
+          track.stop();
+        });
       }
     };
-  }, [initializeCamera, stream]);
+  }, [initializeCamera]);
 
   // Handle device changes
   useEffect(() => {
     const handleDeviceChange = async () => {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      setDevices(videoDevices);
+      console.log('Device change detected');
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log('Updated video devices:', videoDevices);
+        setDevices(videoDevices);
+      } catch (err) {
+        console.error('Error handling device change:', err);
+      }
     };
 
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
@@ -144,7 +223,10 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     <div className="webcam-capture flex flex-col items-center">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 w-full">
-          <p>{error}</p>
+          <div className="flex">
+            <CameraOff className="h-5 w-5 text-red-500 mr-2" />
+            <p className="text-sm">{error}</p>
+          </div>
         </div>
       )}
 
@@ -228,6 +310,32 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
               >
                 <RotateCw className="h-4 w-4 mr-2" />
                 Retake
+              </Button>
+              
+              {onCancel && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onCancel}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              )}
+            </>
+          ) : error ? (
+            <>
+              <Button 
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setAttemptCount(0);
+                  initializeCamera();
+                }}
+                className="bg-fud-green hover:bg-fud-green-dark text-white"
+              >
+                <RotateCw className="h-4 w-4 mr-2" />
+                Try Again
               </Button>
               
               {onCancel && (

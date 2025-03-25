@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Camera, Check } from 'lucide-react';
+import { Camera, Check, AlertCircle, CameraOff } from 'lucide-react';
 import WebcamCapture from '@/components/WebcamCapture';
+import { toast } from 'sonner';
 
 interface FaceCaptureProps {
   onFaceCapture: (imageSrc: string) => void;
@@ -20,6 +21,23 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
   faceImageData
 }) => {
   const [showWebcam, setShowWebcam] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Reset camera error when showing webcam
+  useEffect(() => {
+    if (showWebcam) {
+      setCameraError(null);
+    }
+  }, [showWebcam]);
+
+  const handleCameraError = (error: string) => {
+    console.error('Camera error:', error);
+    setCameraError(error);
+    setShowWebcam(false);
+    toast.error('Camera access failed', {
+      description: 'Please check your camera permissions and try again'
+    });
+  };
 
   return (
     <div className="animate-fade-in">
@@ -34,22 +52,53 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
             <WebcamCapture
               onCapture={onFaceCapture}
               onCancel={() => setShowWebcam(false)}
+              onError={handleCameraError}
             />
           ) : (
             <>
               <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mb-4">
                 <Camera className="h-10 w-10 text-gray-400" />
               </div>
-              <p className="text-gray-600 text-center mb-6 max-w-md">
-                Position the student's face in a well-lit environment for optimal image quality
-              </p>
-              <Button 
-                onClick={() => setShowWebcam(true)}
-                className="bg-fud-green hover:bg-fud-green-dark text-white"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Open Camera
-              </Button>
+              
+              {cameraError ? (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-4 max-w-md">
+                  <div className="flex items-start">
+                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800 mb-1">Camera Error</h4>
+                      <p className="text-xs text-red-700">{cameraError}</p>
+                      <p className="text-xs text-red-700 mt-2">
+                        Please check your camera permissions, try another browser, or use a device with a working camera.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-600 text-center mb-6 max-w-md">
+                  Position the student's face in a well-lit environment for optimal image quality
+                </p>
+              )}
+              
+              <div className="flex flex-wrap gap-3">
+                <Button 
+                  onClick={() => setShowWebcam(true)}
+                  className="bg-fud-green hover:bg-fud-green-dark text-white"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Open Camera
+                </Button>
+                
+                {cameraError && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCameraError(null)}
+                    className="border-fud-green text-fud-green hover:bg-fud-green/10"
+                  >
+                    <CameraOff className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                )}
+              </div>
             </>
           )
         ) : (
