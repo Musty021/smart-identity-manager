@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import useCamera from '@/hooks/useCamera';
 import CameraError from '@/components/camera/CameraError';
 import CameraControls from '@/components/camera/CameraControls';
@@ -25,6 +25,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [uiMode, setUiMode] = useState<'capturing' | 'review' | 'error'>('capturing');
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const mountedRef = useRef(true);
   
   const {
     videoRef,
@@ -45,23 +46,37 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Initialize camera on component mount or after retry
   useEffect(() => {
-    console.log('WebcamCapture: Initializing camera...');
-    const startCamera = async () => {
-      try {
-        await initializeCamera();
-      } catch (err) {
-        console.error('Failed to initialize camera:', err);
-      }
-    };
+    console.log('WebcamCapture: Initializing camera... (attempt', retryAttempt, ')');
     
-    startCamera();
+    // Small delay to ensure DOM is ready before initializing camera
+    const timer = setTimeout(() => {
+      if (!mountedRef.current) return;
+      
+      const startCamera = async () => {
+        try {
+          await initializeCamera();
+        } catch (err) {
+          console.error('Failed to initialize camera:', err);
+        }
+      };
+      
+      startCamera();
+    }, 300);
 
     // Clean up on unmount
     return () => {
+      clearTimeout(timer);
       console.log('WebcamCapture: Cleaning up...');
       cleanup();
     };
   }, [initializeCamera, cleanup, retryAttempt]);
+
+  // Handle component unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Handle camera capture
   const handleCaptureImage = useCallback(() => {
@@ -114,7 +129,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   return (
     <div className="webcam-capture flex flex-col items-center">
-      <CameraError errorMessage={error || ''} />
+      {error && <CameraError errorMessage={error} />}
 
       <CameraPreview
         videoRef={videoRef}

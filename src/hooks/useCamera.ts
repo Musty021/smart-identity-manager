@@ -32,7 +32,6 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
   const [attemptCount, setAttemptCount] = useState(0);
   const maxAttempts = 3;
-  const isVideoReady = useRef(false);
 
   // Handle errors internally and also send to parent if callback provided
   const handleError = useCallback((errorMessage: string) => {
@@ -45,37 +44,32 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     }
   }, [onError]);
 
-  // Retry logic with backoff
-  const retryInitializeCamera = useCallback(async (deviceId?: string) => {
-    if (attemptCount >= maxAttempts) {
-      handleError("Maximum retry attempts reached. Please check your camera permissions.");
-      return;
-    }
-
-    // Exponential backoff
-    const backoffTime = Math.pow(2, attemptCount) * 500;
-    await new Promise(resolve => setTimeout(resolve, backoffTime));
+  // Cleanup function to stop all tracks
+  const cleanup = useCallback(() => {
+    console.log('Cleaning up camera...');
     
-    setAttemptCount(prev => prev + 1);
-    initializeCamera(deviceId).catch(err => {
-      console.error('Retry failed:', err);
-    });
-  }, [attemptCount, handleError]);
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        console.log('Stopping track:', track.label);
+        track.stop();
+      });
+      setStream(null);
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    setIsCapturing(false);
+  }, [stream]);
 
   // Initialize and get access to the camera
   const initializeCamera = useCallback(async (deviceId?: string) => {
     try {
       setError(null);
-      isVideoReady.current = false;
       
       // Clean up any existing streams first
-      if (stream) {
-        console.log('Cleaning up existing stream before initializing camera');
-        stream.getTracks().forEach(track => {
-          console.log('Stopping track:', track.label);
-          track.stop();
-        });
-      }
+      cleanup();
       
       setIsCapturing(true);
 
@@ -94,6 +88,9 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
 
       console.log('Requesting camera access with constraints:', JSON.stringify(constraints));
       
+      // Wait a moment to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('Camera access granted, tracks:', mediaStream.getTracks().map(t => `${t.label} (enabled: ${t.enabled})`));
@@ -104,71 +101,24 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
         
         setStream(mediaStream);
 
-        if (videoRef.current) {
-          console.log('Setting video source object');
-          videoRef.current.srcObject = mediaStream;
-          
-          // Add onloadedmetadata handler
-          await new Promise<void>((resolve, reject) => {
-            if (!videoRef.current) {
-              reject(new Error('Video element not available'));
-              return;
-            }
-            
-            const onLoadedMetadata = () => {
-              if (!videoRef.current) return;
-              
-              console.log('Video metadata loaded, dimensions:', 
-                videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-                
-              if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
-                reject(new Error('Video dimensions are zero. Check your camera permissions.'));
-                return;
-              }
-              
-              videoRef.current.play()
-                .then(() => {
-                  console.log('Video playback started successfully');
-                  isVideoReady.current = true;
-                  resolve();
-                })
-                .catch(err => {
-                  console.error('Error playing video:', err);
-                  reject(err);
-                });
-            };
-            
-            // Set up event handlers
-            videoRef.current.onloadedmetadata = onLoadedMetadata;
-            
-            // If metadata is already loaded, call the handler directly
-            if (videoRef.current.readyState >= 1) {
-              onLoadedMetadata();
-            }
-            
-            videoRef.current.onerror = (event) => {
-              console.error('Video element error:', event);
-              reject(new Error('Video element encountered an error'));
-            };
-            
-            // Add safety timeout
-            const timeoutId = setTimeout(() => {
-              reject(new Error('Timeout waiting for video to be ready'));
-            }, 10000);
-            
-            // Clear timeout on success
-            videoRef.current.oncanplay = () => {
-              clearTimeout(timeoutId);
-              console.log('Video can play event fired');
-              isVideoReady.current = true;
-              resolve();
-            };
-          });
-        } else {
-          console.error('Video ref is null');
+        // Wait for video ref to be available
+        if (!videoRef.current) {
           throw new Error('Video element not available');
         }
-
+        
+        // Set video source and play
+        const video = videoRef.current;
+        video.srcObject = mediaStream;
+        
+        try {
+          // Try to play the video
+          await video.play();
+          console.log('Video playback started');
+        } catch (playError) {
+          console.error('Error playing video:', playError);
+          throw new Error('Could not play video stream');
+        }
+        
         // Get available video devices
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -190,17 +140,21 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
         // Check if we should retry
         if (attemptCount < maxAttempts) {
           console.log(`Retrying camera access (attempt ${attemptCount + 1}/${maxAttempts})...`);
-          retryInitializeCamera(deviceId);
+          setAttemptCount(prev => prev + 1);
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await initializeCamera(deviceId);
         } else {
           const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-          handleError(`Could not access the camera: ${errorMessage}. Please ensure camera permissions are enabled.`);
+          handleError(`Could not access the camera: ${errorMessage}. Please check your camera permissions in browser settings.`);
         }
       }
     } catch (err) {
       console.error('Error in initializeCamera:', err);
       handleError('An unexpected error occurred while setting up the camera');
     }
-  }, [width, height, stream, currentDeviceId, handleError, attemptCount, maxAttempts, retryInitializeCamera]);
+  }, [width, height, cleanup, handleError, attemptCount, maxAttempts, currentDeviceId]);
 
   // Switch between available cameras
   const switchCamera = useCallback(() => {
@@ -224,13 +178,8 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     
     const video = videoRef.current;
     
-    if (!isVideoReady.current) {
-      handleError('Video stream not ready yet. Please wait a moment and try again.');
-      return null;
-    }
-    
-    // Make sure video dimensions are valid
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
+    // Make sure video dimensions are valid and video is playing
+    if (!video.videoWidth || !video.videoHeight || video.paused || video.ended) {
       handleError('Video stream not ready or has zero dimensions');
       return null;
     }
@@ -240,57 +189,48 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
       return null;
     }
     
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
+    try {
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        handleError('Cannot get canvas context');
+        return null;
+      }
+      
       console.log(`Capturing image with dimensions: ${canvas.width}x${canvas.height}`);
       // Draw the video frame to the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Check if the captured image contains any non-transparent pixels
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let hasContent = false;
+      // Get the image data to verify we captured something
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       
-      // Check a sample of pixels to see if we have actual content (not all black)
-      for (let i = 0; i < imageData.length; i += 16) {
-        // Check if this pixel has any non-zero RGB values
-        if (imageData[i] > 5 || imageData[i + 1] > 5 || imageData[i + 2] > 5) {
-          hasContent = true;
-          break;
-        }
+      // Check if the image is completely black (or nearly black)
+      let totalBrightness = 0;
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        totalBrightness += r + g + b;
       }
       
-      if (!hasContent) {
-        console.warn('Captured image appears to be completely black');
+      // If the average brightness is very low, image might be black
+      const avgBrightness = totalBrightness / (imageData.width * imageData.height * 3);
+      if (avgBrightness < 5) { // Threshold for "mostly black"
+        console.warn(`Image appears to be mostly black (avg brightness: ${avgBrightness.toFixed(2)})`);
+        handleError('Captured image appears to be blank. Please ensure your camera is working properly and well lit.');
+        return null;
       }
       
-      return canvas.toDataURL('image/jpeg');
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (err) {
+      console.error('Error capturing image:', err);
+      handleError('Failed to capture image');
+      return null;
     }
-    
-    return null;
   }, [handleError]);
-
-  // Clean up function to stop all tracks
-  const cleanup = useCallback(() => {
-    console.log('Cleaning up camera...');
-    isVideoReady.current = false;
-    
-    if (stream) {
-      stream.getTracks().forEach(track => {
-        console.log('Stopping track:', track.label);
-        track.stop();
-      });
-    }
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    
-    setIsCapturing(false);
-  }, [stream]);
 
   // Handle device changes
   useEffect(() => {
