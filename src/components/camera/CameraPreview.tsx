@@ -56,9 +56,15 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
       checkVideoReady();
     };
     
+    const handlePlaying = () => {
+      console.log('Video playing event triggered');
+      checkVideoReady();
+    };
+    
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('playing', handlePlaying);
     
     // Set a timeout to show loading message if video doesn't become ready
     const timeoutId = setTimeout(() => {
@@ -71,6 +77,7 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('playing', handlePlaying);
       clearTimeout(timeoutId);
     };
   }, [videoRef, isCapturing, videoReady]);

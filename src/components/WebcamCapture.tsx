@@ -25,8 +25,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [uiMode, setUiMode] = useState<'capturing' | 'review' | 'error'>('capturing');
   const [retryAttempt, setRetryAttempt] = useState(0);
-  const mountedRef = useRef(true);
-  const componentMounted = useRef(false);
+  const componentMounted = useRef(true);
   
   const {
     videoRef,
@@ -45,84 +44,70 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     onError 
   });
 
-  // Initialize camera on component mount or after retry
+  // Track component mounting state
   useEffect(() => {
-    console.log('WebcamCapture: Component mount detected');
     componentMounted.current = true;
+    console.log('WebcamCapture mounted');
     
     return () => {
       componentMounted.current = false;
+      console.log('WebcamCapture unmounted');
     };
   }, []);
   
+  // Initialize camera when component mounts or after retry
   useEffect(() => {
-    console.log('WebcamCapture: Initializing camera... (attempt', retryAttempt, ')');
+    console.log('Initializing camera (attempt', retryAttempt, ')');
     
-    if (!componentMounted.current) {
-      console.log('WebcamCapture: Component not mounted, skipping initialization');
-      return;
-    }
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(async () => {
+      if (!componentMounted.current) {
+        console.log('Component not mounted, skipping camera initialization');
+        return;
+      }
+      
+      try {
+        await initializeCamera();
+        console.log('Camera initialization completed');
+      } catch (err) {
+        console.error('Failed to initialize camera:', err);
+      }
+    }, 300);
     
-    // Small delay to ensure DOM is ready before initializing camera
-    const timer = setTimeout(() => {
-      if (!mountedRef.current) return;
-      
-      const startCamera = async () => {
-        try {
-          console.log('WebcamCapture: Starting camera...');
-          await initializeCamera();
-        } catch (err) {
-          console.error('Failed to initialize camera:', err);
-        }
-      };
-      
-      startCamera();
-    }, 500);  // Increased delay to ensure component is fully mounted
-
-    // Clean up on unmount
     return () => {
       clearTimeout(timer);
-      console.log('WebcamCapture: Cleaning up...');
-      cleanup();
     };
-  }, [initializeCamera, cleanup, retryAttempt]);
-
-  // Handle component unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+  }, [initializeCamera, retryAttempt]);
 
   // Handle camera capture
   const handleCaptureImage = useCallback(() => {
-    console.log('WebcamCapture: Attempting to capture image');
+    console.log('Attempting to capture image');
     const imageSrc = captureImage();
     if (imageSrc) {
-      console.log('WebcamCapture: Image captured successfully');
+      console.log('Image captured successfully');
       setCapturedImage(imageSrc);
       setUiMode('review');
     } else {
-      console.error('WebcamCapture: Failed to capture image');
-      handleError('Failed to capture image. Please try again.');
+      console.error('Failed to capture image');
     }
-  }, [captureImage, handleError]);
+  }, [captureImage]);
 
   // Accept the captured image
   const acceptImage = useCallback(() => {
     if (capturedImage) {
-      console.log('WebcamCapture: Image accepted');
+      console.log('Image accepted by user');
       onCapture(capturedImage);
-      cleanup(); // Stop the camera after capture is accepted
+      cleanup();
     }
   }, [capturedImage, onCapture, cleanup]);
 
   // Retake the photo
   const retakeImage = useCallback(() => {
-    console.log('WebcamCapture: Retaking image');
+    console.log('Retaking image');
     setCapturedImage(null);
     setUiMode('capturing');
-    // Force reinitialization by incrementing retry attempt
+    
+    // Force reinitialization of camera
     setTimeout(() => {
       setRetryAttempt(prev => prev + 1);
     }, 100);
@@ -130,9 +115,10 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Reset state on error
   const handleRetry = useCallback(() => {
-    console.log('WebcamCapture: Retrying after error');
+    console.log('Retrying after error');
     setCapturedImage(null);
     setUiMode('capturing');
+    
     // Force reinitialization by incrementing retry attempt
     setTimeout(() => {
       setRetryAttempt(prev => prev + 1);
@@ -142,7 +128,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   // Update UI mode based on error state
   useEffect(() => {
     if (error) {
-      console.log('WebcamCapture: Error detected, updating UI mode');
+      console.log('Error detected, updating UI mode');
       setUiMode('error');
     }
   }, [error]);
