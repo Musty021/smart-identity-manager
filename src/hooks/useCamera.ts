@@ -63,6 +63,33 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     setIsCapturing(false);
   }, [stream]);
 
+  // Wait for video element to be ready
+  const waitForVideoElement = useCallback(async (maxWaitTime = 2000, interval = 100): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // Check right away first
+      if (videoRef.current) {
+        console.log('Video element found immediately');
+        return resolve();
+      }
+      
+      console.log('Waiting for video element to be ready...');
+      let waitTime = 0;
+      
+      const checkInterval = setInterval(() => {
+        if (videoRef.current) {
+          console.log('Video element found after waiting');
+          clearInterval(checkInterval);
+          resolve();
+        } else if (waitTime >= maxWaitTime) {
+          console.error('Timed out waiting for video element');
+          clearInterval(checkInterval);
+          reject(new Error('Video element not available after waiting'));
+        }
+        waitTime += interval;
+      }, interval);
+    });
+  }, []);
+
   // Initialize and get access to the camera
   const initializeCamera = useCallback(async (deviceId?: string) => {
     try {
@@ -88,8 +115,15 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
 
       console.log('Requesting camera access with constraints:', JSON.stringify(constraints));
       
+      // Wait for video element to be available
+      try {
+        await waitForVideoElement();
+      } catch (err) {
+        throw new Error(`Video element not ready: ${err instanceof Error ? err.message : 'unknown error'}`);
+      }
+      
       // Wait a moment to ensure cleanup is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -101,19 +135,40 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
         
         setStream(mediaStream);
 
-        // Wait for video ref to be available
+        // Double check video ref is still available
         if (!videoRef.current) {
-          throw new Error('Video element not available');
+          throw new Error('Video element not available after stream acquisition');
         }
         
         // Set video source and play
         const video = videoRef.current;
         video.srcObject = mediaStream;
+        video.playsInline = true;  // Important for iOS
         
         try {
           // Try to play the video
           await video.play();
           console.log('Video playback started');
+          
+          // Wait for the video to have valid dimensions
+          await new Promise<void>((resolve, reject) => {
+            const checkDimensions = () => {
+              if (!videoRef.current) {
+                return reject('Video element lost during dimension check');
+              }
+              
+              if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+                console.log('Video has valid dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+                resolve();
+              } else {
+                console.log('Waiting for valid video dimensions...');
+                setTimeout(checkDimensions, 100);
+              }
+            };
+            
+            checkDimensions();
+          });
+          
         } catch (playError) {
           console.error('Error playing video:', playError);
           throw new Error('Could not play video stream');
@@ -154,7 +209,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
       console.error('Error in initializeCamera:', err);
       handleError('An unexpected error occurred while setting up the camera');
     }
-  }, [width, height, cleanup, handleError, attemptCount, maxAttempts, currentDeviceId]);
+  }, [width, height, cleanup, handleError, attemptCount, maxAttempts, currentDeviceId, waitForVideoElement]);
 
   // Switch between available cameras
   const switchCamera = useCallback(() => {

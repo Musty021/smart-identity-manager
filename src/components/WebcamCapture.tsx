@@ -26,6 +26,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   const [uiMode, setUiMode] = useState<'capturing' | 'review' | 'error'>('capturing');
   const [retryAttempt, setRetryAttempt] = useState(0);
   const mountedRef = useRef(true);
+  const componentMounted = useRef(false);
   
   const {
     videoRef,
@@ -46,7 +47,21 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Initialize camera on component mount or after retry
   useEffect(() => {
+    console.log('WebcamCapture: Component mount detected');
+    componentMounted.current = true;
+    
+    return () => {
+      componentMounted.current = false;
+    };
+  }, []);
+  
+  useEffect(() => {
     console.log('WebcamCapture: Initializing camera... (attempt', retryAttempt, ')');
+    
+    if (!componentMounted.current) {
+      console.log('WebcamCapture: Component not mounted, skipping initialization');
+      return;
+    }
     
     // Small delay to ensure DOM is ready before initializing camera
     const timer = setTimeout(() => {
@@ -54,6 +69,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
       
       const startCamera = async () => {
         try {
+          console.log('WebcamCapture: Starting camera...');
           await initializeCamera();
         } catch (err) {
           console.error('Failed to initialize camera:', err);
@@ -61,7 +77,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
       };
       
       startCamera();
-    }, 300);
+    }, 500);  // Increased delay to ensure component is fully mounted
 
     // Clean up on unmount
     return () => {
@@ -107,7 +123,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     setCapturedImage(null);
     setUiMode('capturing');
     // Force reinitialization by incrementing retry attempt
-    setRetryAttempt(prev => prev + 1);
+    setTimeout(() => {
+      setRetryAttempt(prev => prev + 1);
+    }, 100);
   }, []);
 
   // Reset state on error
@@ -116,7 +134,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     setCapturedImage(null);
     setUiMode('capturing');
     // Force reinitialization by incrementing retry attempt
-    setRetryAttempt(prev => prev + 1);
+    setTimeout(() => {
+      setRetryAttempt(prev => prev + 1);
+    }, 100);
   }, []);
 
   // Update UI mode based on error state
@@ -139,7 +159,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
         height={height}
       />
 
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" width={width} height={height} />
 
       {showControls && (
         <CameraControls
