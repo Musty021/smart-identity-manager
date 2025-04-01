@@ -27,7 +27,13 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
           playsInline
           muted
           className="w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }} // Mirror for selfie view
+          style={{ 
+            transform: 'scaleX(-1)',  // Mirror for selfie view
+            display: 'block',
+            backgroundColor: '#000'
+          }}
+          width={width}
+          height={height}
         />
       ) : capturedImage ? (
         <img 

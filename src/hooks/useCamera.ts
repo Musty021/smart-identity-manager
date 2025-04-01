@@ -32,6 +32,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
   const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
   const [attemptCount, setAttemptCount] = useState(0);
   const maxAttempts = 3;
+  const isVideoReady = useRef(false);
 
   // Handle errors internally and also send to parent if callback provided
   const handleError = useCallback((errorMessage: string) => {
@@ -65,6 +66,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
   const initializeCamera = useCallback(async (deviceId?: string) => {
     try {
       setError(null);
+      isVideoReady.current = false;
       
       // Clean up any existing streams first
       if (stream) {
@@ -79,49 +81,87 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
 
       console.log('Initializing camera with deviceId:', deviceId || 'default');
       
-      // Request camera access with the specified device (if available)
+      // Request camera access with better constraints
       const constraints: MediaStreamConstraints = {
-        video: deviceId 
-          ? { deviceId: { exact: deviceId } } 
-          : { facingMode: 'user' }
+        video: {
+          facingMode: 'user',
+          width: { ideal: width },
+          height: { ideal: height },
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {})
+        },
+        audio: false
       };
 
       console.log('Requesting camera access with constraints:', JSON.stringify(constraints));
       
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log('Camera access granted, tracks:', mediaStream.getTracks().map(t => t.label));
+        console.log('Camera access granted, tracks:', mediaStream.getTracks().map(t => `${t.label} (enabled: ${t.enabled})`));
+        
+        if (!mediaStream || mediaStream.getVideoTracks().length === 0) {
+          throw new Error('No video tracks available in the media stream');
+        }
+        
         setStream(mediaStream);
 
         if (videoRef.current) {
           console.log('Setting video source object');
           videoRef.current.srcObject = mediaStream;
+          
+          // Add onloadedmetadata handler
           await new Promise<void>((resolve, reject) => {
             if (!videoRef.current) {
               reject(new Error('Video element not available'));
               return;
             }
             
-            videoRef.current.onloadedmetadata = () => {
-              console.log('Video metadata loaded, dimensions:', 
-                videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+            const onLoadedMetadata = () => {
+              if (!videoRef.current) return;
               
-              if (videoRef.current) {
-                videoRef.current.play()
-                  .then(() => {
-                    console.log('Video playback started successfully');
-                    resolve();
-                  })
-                  .catch(err => {
-                    console.error('Error playing video:', err);
-                    reject(err);
-                  });
+              console.log('Video metadata loaded, dimensions:', 
+                videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+                
+              if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+                reject(new Error('Video dimensions are zero. Check your camera permissions.'));
+                return;
               }
+              
+              videoRef.current.play()
+                .then(() => {
+                  console.log('Video playback started successfully');
+                  isVideoReady.current = true;
+                  resolve();
+                })
+                .catch(err => {
+                  console.error('Error playing video:', err);
+                  reject(err);
+                });
             };
+            
+            // Set up event handlers
+            videoRef.current.onloadedmetadata = onLoadedMetadata;
+            
+            // If metadata is already loaded, call the handler directly
+            if (videoRef.current.readyState >= 1) {
+              onLoadedMetadata();
+            }
             
             videoRef.current.onerror = (event) => {
               console.error('Video element error:', event);
               reject(new Error('Video element encountered an error'));
+            };
+            
+            // Add safety timeout
+            const timeoutId = setTimeout(() => {
+              reject(new Error('Timeout waiting for video to be ready'));
+            }, 10000);
+            
+            // Clear timeout on success
+            videoRef.current.oncanplay = () => {
+              clearTimeout(timeoutId);
+              console.log('Video can play event fired');
+              isVideoReady.current = true;
+              resolve();
             };
           });
         } else {
@@ -184,6 +224,11 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     
     const video = videoRef.current;
     
+    if (!isVideoReady.current) {
+      handleError('Video stream not ready yet. Please wait a moment and try again.');
+      return null;
+    }
+    
     // Make sure video dimensions are valid
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       handleError('Video stream not ready or has zero dimensions');
@@ -202,7 +247,26 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     const ctx = canvas.getContext('2d');
     if (ctx) {
       console.log(`Capturing image with dimensions: ${canvas.width}x${canvas.height}`);
+      // Draw the video frame to the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Check if the captured image contains any non-transparent pixels
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let hasContent = false;
+      
+      // Check a sample of pixels to see if we have actual content (not all black)
+      for (let i = 0; i < imageData.length; i += 16) {
+        // Check if this pixel has any non-zero RGB values
+        if (imageData[i] > 5 || imageData[i + 1] > 5 || imageData[i + 2] > 5) {
+          hasContent = true;
+          break;
+        }
+      }
+      
+      if (!hasContent) {
+        console.warn('Captured image appears to be completely black');
+      }
+      
       return canvas.toDataURL('image/jpeg');
     }
     
@@ -212,12 +276,19 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
   // Clean up function to stop all tracks
   const cleanup = useCallback(() => {
     console.log('Cleaning up camera...');
+    isVideoReady.current = false;
+    
     if (stream) {
       stream.getTracks().forEach(track => {
         console.log('Stopping track:', track.label);
         track.stop();
       });
     }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
     setIsCapturing(false);
   }, [stream]);
 

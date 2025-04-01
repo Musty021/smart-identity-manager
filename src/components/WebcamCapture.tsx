@@ -24,6 +24,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 }) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [uiMode, setUiMode] = useState<'capturing' | 'review' | 'error'>('capturing');
+  const [retryAttempt, setRetryAttempt] = useState(0);
   
   const {
     videoRef,
@@ -36,9 +37,13 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     captureImage,
     handleError,
     cleanup
-  } = useCamera({ width, height, onError });
+  } = useCamera({ 
+    width, 
+    height, 
+    onError 
+  });
 
-  // Initialize camera on component mount
+  // Initialize camera on component mount or after retry
   useEffect(() => {
     console.log('WebcamCapture: Initializing camera...');
     const startCamera = async () => {
@@ -56,7 +61,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
       console.log('WebcamCapture: Cleaning up...');
       cleanup();
     };
-  }, [initializeCamera, cleanup]);
+  }, [initializeCamera, cleanup, retryAttempt]);
 
   // Handle camera capture
   const handleCaptureImage = useCallback(() => {
@@ -68,8 +73,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
       setUiMode('review');
     } else {
       console.error('WebcamCapture: Failed to capture image');
+      handleError('Failed to capture image. Please try again.');
     }
-  }, [captureImage]);
+  }, [captureImage, handleError]);
 
   // Accept the captured image
   const acceptImage = useCallback(() => {
@@ -85,16 +91,18 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
     console.log('WebcamCapture: Retaking image');
     setCapturedImage(null);
     setUiMode('capturing');
-    initializeCamera();
-  }, [initializeCamera]);
+    // Force reinitialization by incrementing retry attempt
+    setRetryAttempt(prev => prev + 1);
+  }, []);
 
   // Reset state on error
   const handleRetry = useCallback(() => {
     console.log('WebcamCapture: Retrying after error');
     setCapturedImage(null);
     setUiMode('capturing');
-    initializeCamera();
-  }, [initializeCamera]);
+    // Force reinitialization by incrementing retry attempt
+    setRetryAttempt(prev => prev + 1);
+  }, []);
 
   // Update UI mode based on error state
   useEffect(() => {
