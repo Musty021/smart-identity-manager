@@ -35,6 +35,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
 
   // Handle errors internally and also send to parent if callback provided
   const handleError = useCallback((errorMessage: string) => {
+    console.error('Camera error:', errorMessage);
     setError(errorMessage);
     setIsCapturing(false);
     
@@ -64,51 +65,80 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
   const initializeCamera = useCallback(async (deviceId?: string) => {
     try {
       setError(null);
+      
+      // Clean up any existing streams first
+      if (stream) {
+        console.log('Cleaning up existing stream before initializing camera');
+        stream.getTracks().forEach(track => {
+          console.log('Stopping track:', track.label);
+          track.stop();
+        });
+      }
+      
       setIsCapturing(true);
 
-      // Stop any existing stream
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
+      console.log('Initializing camera with deviceId:', deviceId || 'default');
+      
       // Request camera access with the specified device (if available)
       const constraints: MediaStreamConstraints = {
         video: deviceId 
-          ? { deviceId: { exact: deviceId }, width, height, facingMode: 'user' } 
-          : { width, height, facingMode: 'user' }
+          ? { deviceId: { exact: deviceId } } 
+          : { facingMode: 'user' }
       };
 
-      console.log('Requesting camera access with constraints:', constraints);
+      console.log('Requesting camera access with constraints:', JSON.stringify(constraints));
       
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Camera access granted, tracks:', mediaStream.getTracks().map(t => t.label));
         setStream(mediaStream);
 
         if (videoRef.current) {
+          console.log('Setting video source object');
           videoRef.current.srcObject = mediaStream;
-          
-          // Check if the video is actually streaming data
-          videoRef.current.onloadedmetadata = () => {
-            console.log('Video metadata loaded');
-            videoRef.current.play().catch(err => {
-              console.error('Error playing video:', err);
-              handleError('Error starting video stream: ' + err.message);
-            });
-          };
-          
-          videoRef.current.onerror = () => {
-            handleError('Video element encountered an error');
-          };
+          await new Promise<void>((resolve, reject) => {
+            if (!videoRef.current) {
+              reject(new Error('Video element not available'));
+              return;
+            }
+            
+            videoRef.current.onloadedmetadata = () => {
+              console.log('Video metadata loaded, dimensions:', 
+                videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+              
+              if (videoRef.current) {
+                videoRef.current.play()
+                  .then(() => {
+                    console.log('Video playback started successfully');
+                    resolve();
+                  })
+                  .catch(err => {
+                    console.error('Error playing video:', err);
+                    reject(err);
+                  });
+              }
+            };
+            
+            videoRef.current.onerror = (event) => {
+              console.error('Video element error:', event);
+              reject(new Error('Video element encountered an error'));
+            };
+          });
+        } else {
+          console.error('Video ref is null');
+          throw new Error('Video element not available');
         }
 
         // Get available video devices
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        console.log('Available video devices:', videoDevices);
+        console.log('Available video devices:', videoDevices.map(d => d.label || 'Unlabeled device'));
         setDevices(videoDevices);
 
         // Set current device ID if not already set
-        if (!currentDeviceId && videoDevices.length > 0) {
+        if (deviceId) {
+          setCurrentDeviceId(deviceId);
+        } else if (!currentDeviceId && videoDevices.length > 0) {
           setCurrentDeviceId(videoDevices[0].deviceId);
         }
         
@@ -140,31 +170,42 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     const nextIndex = (currentIndex + 1) % devices.length;
     const nextDeviceId = devices[nextIndex].deviceId;
     
+    console.log(`Switching camera from ${currentIndex} to ${nextIndex}`);
     setCurrentDeviceId(nextDeviceId);
     initializeCamera(nextDeviceId);
   }, [devices, currentDeviceId, initializeCamera]);
 
   // Capture an image from the video stream
   const captureImage = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      
-      // Make sure video dimensions are valid
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        handleError('Video stream not ready or has zero dimensions');
-        return null;
-      }
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg');
-      }
+    if (!videoRef.current) {
+      handleError('Video element not available');
+      return null;
     }
+    
+    const video = videoRef.current;
+    
+    // Make sure video dimensions are valid
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      handleError('Video stream not ready or has zero dimensions');
+      return null;
+    }
+    
+    if (!canvasRef.current) {
+      handleError('Canvas element not available');
+      return null;
+    }
+    
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      console.log(`Capturing image with dimensions: ${canvas.width}x${canvas.height}`);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg');
+    }
+    
     return null;
   }, [handleError]);
 
@@ -173,7 +214,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
     console.log('Cleaning up camera...');
     if (stream) {
       stream.getTracks().forEach(track => {
-        console.log('Stopping track:', track.kind, track.label);
+        console.log('Stopping track:', track.label);
         track.stop();
       });
     }
@@ -187,7 +228,7 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        console.log('Updated video devices:', videoDevices);
+        console.log('Updated video devices:', videoDevices.map(d => d.label || 'Unlabeled device'));
         setDevices(videoDevices);
       } catch (err) {
         console.error('Error handling device change:', err);

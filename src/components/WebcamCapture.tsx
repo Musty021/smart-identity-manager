@@ -40,31 +40,49 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Initialize camera on component mount
   useEffect(() => {
-    console.log('Initializing camera...');
-    initializeCamera();
+    console.log('WebcamCapture: Initializing camera...');
+    const startCamera = async () => {
+      try {
+        await initializeCamera();
+      } catch (err) {
+        console.error('Failed to initialize camera:', err);
+      }
+    };
+    
+    startCamera();
 
     // Clean up on unmount
-    return cleanup;
+    return () => {
+      console.log('WebcamCapture: Cleaning up...');
+      cleanup();
+    };
   }, [initializeCamera, cleanup]);
 
   // Handle camera capture
   const handleCaptureImage = useCallback(() => {
+    console.log('WebcamCapture: Attempting to capture image');
     const imageSrc = captureImage();
     if (imageSrc) {
+      console.log('WebcamCapture: Image captured successfully');
       setCapturedImage(imageSrc);
       setUiMode('review');
+    } else {
+      console.error('WebcamCapture: Failed to capture image');
     }
   }, [captureImage]);
 
   // Accept the captured image
   const acceptImage = useCallback(() => {
     if (capturedImage) {
+      console.log('WebcamCapture: Image accepted');
       onCapture(capturedImage);
+      cleanup(); // Stop the camera after capture is accepted
     }
-  }, [capturedImage, onCapture]);
+  }, [capturedImage, onCapture, cleanup]);
 
   // Retake the photo
   const retakeImage = useCallback(() => {
+    console.log('WebcamCapture: Retaking image');
     setCapturedImage(null);
     setUiMode('capturing');
     initializeCamera();
@@ -72,6 +90,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
 
   // Reset state on error
   const handleRetry = useCallback(() => {
+    console.log('WebcamCapture: Retrying after error');
     setCapturedImage(null);
     setUiMode('capturing');
     initializeCamera();
@@ -80,6 +99,7 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({
   // Update UI mode based on error state
   useEffect(() => {
     if (error) {
+      console.log('WebcamCapture: Error detected, updating UI mode');
       setUiMode('error');
     }
   }, [error]);
