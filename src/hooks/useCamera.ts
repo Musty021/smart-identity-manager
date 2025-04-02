@@ -1,54 +1,55 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
-interface UseCameraProps {
-  width?: number;
-  height?: number;
-  onError?: (errorMessage: string) => void;
+interface UseCameraOptions {
+  onError?: (error: string) => void;
 }
 
-interface UseCameraReturn {
-  videoRef: React.RefObject<HTMLVideoElement>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  stream: MediaStream | null;
-  isCapturing: boolean;
-  error: string | null;
-  devices: MediaDeviceInfo[];
-  currentDeviceId: string;
-  initializeCamera: (deviceId?: string) => Promise<void>;
-  switchCamera: () => void;
-  captureImage: () => string | null;
-  handleError: (errorMessage: string) => void;
-  cleanup: () => void;
-}
-
-const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}): UseCameraReturn => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export function useCamera({ onError }: UseCameraOptions = {}) {
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
+  const [activeDeviceId, setActiveDeviceId] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Handle errors internally and also send to parent if callback provided
-  const handleError = useCallback((errorMessage: string) => {
-    console.error('Camera error:', errorMessage);
-    setError(errorMessage);
-    setIsCapturing(false);
-    
-    if (onError) {
-      onError(errorMessage);
-    }
+  // Handle errors
+  const handleError = useCallback((message: string) => {
+    console.error(`Camera error: ${message}`);
+    setError(message);
+    if (onError) onError(message);
   }, [onError]);
 
-  // Cleanup function to stop all tracks
-  const cleanup = useCallback(() => {
-    console.log('Cleaning up camera...');
-    
+  // Get list of video devices
+  const getVideoDevices = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        throw new Error('Browser does not support media devices enumeration');
+      }
+
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = allDevices.filter(device => device.kind === 'videoinput');
+      
+      console.log(`Found ${videoDevices.length} video devices`);
+      setDevices(videoDevices);
+      
+      if (videoDevices.length > 0 && !activeDeviceId) {
+        setActiveDeviceId(videoDevices[0].deviceId);
+      }
+      
+      return videoDevices;
+    } catch (err) {
+      handleError(`Could not get camera devices: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
+  }, [activeDeviceId, handleError]);
+
+  // Stop any active media streams
+  const stopMediaStream = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach(track => {
-        console.log('Stopping track:', track.label);
+        console.log(`Stopping track: ${track.label}`);
         track.stop();
       });
       setStream(null);
@@ -58,243 +59,217 @@ const useCamera = ({ width = 480, height = 360, onError }: UseCameraProps = {}):
       videoRef.current.srcObject = null;
     }
     
-    setIsCapturing(false);
+    setIsReady(false);
   }, [stream]);
 
-  // Get available camera devices
-  const getVideoDevices = useCallback(async () => {
+  // Initialize camera with specified device ID
+  const startCamera = useCallback(async (deviceId?: string) => {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        throw new Error('MediaDevices API not supported in this browser');
-      }
-      
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      
-      console.log('Available video devices:', videoDevices.length);
-      videoDevices.forEach((device, index) => {
-        console.log(`Device ${index + 1}: ${device.label || 'Unnamed device'} (${device.deviceId})`);
-      });
-      
-      setDevices(videoDevices);
-      
-      // Set default device if not already set
-      if (!currentDeviceId && videoDevices.length > 0) {
-        setCurrentDeviceId(videoDevices[0].deviceId);
-      }
-      
-      return videoDevices;
-    } catch (err) {
-      console.error('Error enumerating devices:', err);
-      handleError('Failed to enumerate camera devices');
-      return [];
-    }
-  }, [currentDeviceId, handleError]);
-
-  // Initialize and get access to the camera
-  const initializeCamera = useCallback(async (deviceId?: string) => {
-    try {
+      // Reset previous state
       setError(null);
-      
-      // Clean up any existing streams first
-      cleanup();
+      stopMediaStream();
 
-      // Check if MediaDevices API is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('MediaDevices API not supported in this browser');
-      }
-      
-      console.log('Initializing camera...');
-      setIsCapturing(true);
-      
-      // Get available devices
-      const videoDevices = await getVideoDevices();
-      
-      if (videoDevices.length === 0) {
-        throw new Error('No video input devices detected');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Browser does not support media devices API');
       }
 
-      // Set constraints for camera
+      console.log('Starting camera...');
+      
+      // Get available video devices if not already loaded
+      if (devices.length === 0) {
+        await getVideoDevices();
+      }
+
+      // Set up constraints for camera
       const constraints: MediaStreamConstraints = {
         video: {
-          width: { ideal: width },
-          height: { ideal: height },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
           facingMode: 'user',
           ...(deviceId ? { deviceId: { exact: deviceId } } : {})
         },
         audio: false
       };
 
-      console.log('Requesting camera with constraints:', JSON.stringify(constraints));
+      console.log('Requesting camera with constraints:', constraints);
       
-      // Request camera access
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      console.log('Camera access granted');
-      
-      // Check if we got video tracks
-      if (!mediaStream || mediaStream.getVideoTracks().length === 0) {
-        throw new Error('No video tracks available in the media stream');
+      // Check if we got any video tracks
+      if (!mediaStream.getVideoTracks().length) {
+        throw new Error('No video track available in media stream');
       }
       
-      console.log('Video tracks:', mediaStream.getVideoTracks().length);
-      mediaStream.getVideoTracks().forEach(track => {
-        console.log(`Track: ${track.label}, Enabled: ${track.enabled}`);
-      });
-      
       setStream(mediaStream);
-
-      // Ensure video element exists
+      
       if (!videoRef.current) {
         throw new Error('Video element not available');
       }
-
-      // Set up video element
-      const video = videoRef.current;
-      video.srcObject = mediaStream;
-      video.playsInline = true; // Important for iOS
-
-      // Wait for video to be ready before playing
-      video.onloadedmetadata = async () => {
-        try {
-          await video.play();
-          console.log('Video playback started');
-        } catch (err) {
-          console.error('Error playing video:', err);
-          handleError('Could not play video stream. Please check your browser permissions.');
-        }
-      };
-
-      // Update current device ID
+      
+      // Connect stream to video element
+      videoRef.current.srcObject = mediaStream;
+      
+      // Update active device ID
       if (deviceId) {
-        setCurrentDeviceId(deviceId);
-      } else if (videoDevices.length > 0 && !currentDeviceId) {
-        setCurrentDeviceId(videoDevices[0].deviceId);
+        setActiveDeviceId(deviceId);
       }
-
+      
+      return true;
     } catch (err) {
-      console.error('Error accessing camera:', err);
-      handleError(err instanceof Error ? err.message : 'Failed to access camera');
-      setIsCapturing(false);
+      handleError(`Failed to start camera: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
     }
-  }, [width, height, cleanup, handleError, getVideoDevices, currentDeviceId]);
+  }, [devices.length, getVideoDevices, handleError, stopMediaStream]);
 
-  // Switch between available cameras
+  // Switch to another camera
   const switchCamera = useCallback(() => {
     if (devices.length <= 1) {
       console.log('Only one camera available, cannot switch');
       return;
     }
     
-    const currentIndex = devices.findIndex(device => device.deviceId === currentDeviceId);
+    const currentIndex = devices.findIndex(device => device.deviceId === activeDeviceId);
     const nextIndex = (currentIndex + 1) % devices.length;
     const nextDeviceId = devices[nextIndex].deviceId;
     
-    console.log(`Switching camera from ${currentIndex} to ${nextIndex}`);
-    initializeCamera(nextDeviceId);
-  }, [devices, currentDeviceId, initializeCamera]);
+    console.log(`Switching camera from device ${currentIndex} to device ${nextIndex}`);
+    startCamera(nextDeviceId);
+  }, [activeDeviceId, devices, startCamera]);
 
-  // Capture an image from the video stream
-  const captureImage = useCallback(() => {
-    if (!videoRef.current) {
-      handleError('Video element not available');
-      return null;
-    }
-    
-    const video = videoRef.current;
-    
-    // Make sure video dimensions are valid and video is playing
-    if (!video.videoWidth || !video.videoHeight || video.paused || video.ended) {
-      handleError('Video stream not ready or has zero dimensions');
-      return null;
-    }
-    
-    if (!canvasRef.current) {
-      handleError('Canvas element not available');
-      return null;
-    }
-    
+  // Capture image from video feed
+  const captureImage = useCallback((): string | null => {
     try {
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        handleError('Cannot get canvas context');
+      if (!videoRef.current || !canvasRef.current) {
+        handleError('Video or canvas element not available');
         return null;
       }
       
-      console.log(`Capturing image with dimensions: ${canvas.width}x${canvas.height}`);
-      // Draw the video frame to the canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
       
-      // Get the image data to verify we captured something
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Check if the image is completely black (or nearly black)
-      let totalBrightness = 0;
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        const r = imageData.data[i];
-        const g = imageData.data[i + 1];
-        const b = imageData.data[i + 2];
-        totalBrightness += r + g + b;
+      if (!video.videoWidth || !video.videoHeight || video.paused || video.ended) {
+        handleError('Video stream not ready');
+        return null;
       }
       
-      // If the average brightness is very low, image might be black
-      const avgBrightness = totalBrightness / (imageData.width * imageData.height * 3);
-      if (avgBrightness < 5) { // Threshold for "mostly black"
-        console.warn(`Image appears to be mostly black (avg brightness: ${avgBrightness.toFixed(2)})`);
-        handleError('Captured image appears to be blank. Please check your camera and lighting.');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        handleError('Could not get canvas context');
+        return null;
+      }
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw video frame to canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Check if image is mostly black (blank camera)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // Calculate average brightness
+      let totalBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        totalBrightness += (r + g + b) / 3;
+      }
+      
+      const avgBrightness = totalBrightness / (canvas.width * canvas.height);
+      if (avgBrightness < 10) { // Very dark/black threshold
+        handleError('Camera image appears to be blank. Please check your camera permissions and lighting.');
         return null;
       }
       
       return canvas.toDataURL('image/jpeg', 0.9);
     } catch (err) {
-      console.error('Error capturing image:', err);
-      handleError('Failed to capture image');
+      handleError(`Failed to capture image: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }, [handleError]);
 
-  // Check for MediaDevices API support on mount
+  // Monitor video readiness
   useEffect(() => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      handleError('MediaDevices API is not supported in your browser. Please use a modern browser.');
+    if (!videoRef.current || !stream) {
+      setIsReady(false);
       return;
     }
-
-    // Initial enumeration of devices
-    getVideoDevices();
     
-    // Listen for device changes (e.g., camera connected/disconnected)
+    const video = videoRef.current;
+    
+    const checkVideoReady = () => {
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        setIsReady(true);
+      }
+    };
+    
+    // Check immediately
+    checkVideoReady();
+    
+    // Set up event listeners
+    const handleCanPlay = () => {
+      console.log('Video can play event');
+      checkVideoReady();
+    };
+    
+    const handleLoadedMetadata = () => {
+      console.log('Video loaded metadata event');
+      checkVideoReady();
+    };
+    
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('loadeddata', checkVideoReady);
+    
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('loadeddata', checkVideoReady);
+    };
+  }, [stream]);
+
+  // Set up device change listener
+  useEffect(() => {
+    if (!navigator.mediaDevices) return;
+    
     const handleDeviceChange = async () => {
-      console.log('Device change detected');
+      console.log('Media devices changed');
       await getVideoDevices();
     };
-
+    
     navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    
+    // Initial device enumeration
+    getVideoDevices();
     
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
-      cleanup();
     };
-  }, [getVideoDevices, handleError, cleanup]);
+  }, [getVideoDevices]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopMediaStream();
+    };
+  }, [stopMediaStream]);
 
   return {
     videoRef,
     canvasRef,
-    stream,
-    isCapturing,
+    isReady,
     error,
     devices,
-    currentDeviceId,
-    initializeCamera,
+    activeDeviceId,
+    startCamera,
     switchCamera,
     captureImage,
-    handleError,
-    cleanup
+    stopCamera: stopMediaStream,
+    hasMultipleCameras: devices.length > 1
   };
-};
+}
 
 export default useCamera;

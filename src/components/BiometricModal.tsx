@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { biometricService } from '@/services/biometricService';
-import WebcamCapture from './WebcamCapture';
+import CameraUI from './camera/CameraUI';
 
 interface BiometricModalProps {
   isOpen: boolean;
@@ -148,7 +148,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
         {status === 'capturing' && verifying === 'face' && (
           <div className="flex flex-col items-center">
             <h4 className="text-lg font-medium mb-4">Face Verification</h4>
-            <WebcamCapture
+            <CameraUI
               onCapture={handleFaceCapture}
               onCancel={() => resetState()}
               width={400}

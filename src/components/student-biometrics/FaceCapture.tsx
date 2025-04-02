@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Camera, Check, AlertCircle, CameraOff } from 'lucide-react';
-import WebcamCapture from '@/components/WebcamCapture';
+import { Camera, Check, AlertCircle } from 'lucide-react';
+import CameraUI from '@/components/camera/CameraUI';
 import { toast } from 'sonner';
 
 interface FaceCaptureProps {
@@ -20,20 +20,20 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
   faceImageCaptured,
   faceImageData
 }) => {
-  const [showWebcam, setShowWebcam] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Reset camera error when showing webcam
-  useEffect(() => {
-    if (showWebcam) {
+  // Reset camera error when showing camera
+  React.useEffect(() => {
+    if (showCamera) {
       setCameraError(null);
     }
-  }, [showWebcam]);
+  }, [showCamera]);
 
   const handleCameraError = (error: string) => {
     console.error('Camera error:', error);
     setCameraError(error);
-    setShowWebcam(false);
+    setShowCamera(false);
     toast.error('Camera access failed', {
       description: 'Please check your camera permissions and try again'
     });
@@ -48,11 +48,10 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
       
       <div className="flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 mb-6">
         {!faceImageCaptured ? (
-          showWebcam ? (
-            <WebcamCapture
+          showCamera ? (
+            <CameraUI
               onCapture={onFaceCapture}
-              onCancel={() => setShowWebcam(false)}
-              onError={handleCameraError}
+              onCancel={() => setShowCamera(false)}
             />
           ) : (
             <>
@@ -79,26 +78,13 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
                 </p>
               )}
               
-              <div className="flex flex-wrap gap-3">
-                <Button 
-                  onClick={() => setShowWebcam(true)}
-                  className="bg-fud-green hover:bg-fud-green-dark text-white"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Open Camera
-                </Button>
-                
-                {cameraError && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setCameraError(null)}
-                    className="border-fud-green text-fud-green hover:bg-fud-green/10"
-                  >
-                    <CameraOff className="h-4 w-4 mr-2" />
-                    Try Again
-                  </Button>
-                )}
-              </div>
+              <Button 
+                onClick={() => setShowCamera(true)}
+                className="bg-fud-green hover:bg-fud-green-dark text-white"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Open Camera
+              </Button>
             </>
           )
         ) : (
@@ -121,7 +107,7 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
             <Button
               variant="outline"
               onClick={() => {
-                setShowWebcam(true);
+                setShowCamera(true);
                 onFaceCapture(null);
               }}
               className="text-fud-green border-fud-green hover:bg-fud-green/10"
