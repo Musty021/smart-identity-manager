@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Camera, Check, AlertCircle } from 'lucide-react';
-import CameraUI from '@/components/camera/CameraUI';
+import { Check, AlertCircle } from 'lucide-react';
+import CameraComponent from '@/components/Camera';
 import { toast } from 'sonner';
 
 interface FaceCaptureProps {
@@ -39,6 +39,11 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
     });
   };
 
+  const handleCapture = (imageSrc: string) => {
+    onFaceCapture(imageSrc);
+    setShowCamera(false);
+  };
+
   return (
     <div className="animate-fade-in">
       <h3 className="text-xl font-semibold text-fud-navy mb-4">Step 1: Face ID Capture</h3>
@@ -49,14 +54,11 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
       <div className="flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 mb-6">
         {!faceImageCaptured ? (
           showCamera ? (
-            <CameraUI
-              onCapture={onFaceCapture}
-              onCancel={() => setShowCamera(false)}
-            />
+            <CameraComponent onCapture={handleCapture} />
           ) : (
-            <>
+            <div className="flex flex-col items-center">
               <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mb-4">
-                <Camera className="h-10 w-10 text-gray-400" />
+                <AlertCircle className="h-10 w-10 text-gray-400" />
               </div>
               
               {cameraError ? (
@@ -82,10 +84,9 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
                 onClick={() => setShowCamera(true)}
                 className="bg-fud-green hover:bg-fud-green-dark text-white"
               >
-                <Camera className="h-4 w-4 mr-2" />
                 Open Camera
               </Button>
-            </>
+            </div>
           )
         ) : (
           <div className="text-center">
@@ -94,7 +95,6 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
                 src={faceImageData!} 
                 alt="Captured face" 
                 className="w-full h-full object-cover rounded-full border-4 border-green-200"
-                style={{ transform: 'scaleX(-1)' }} // Mirror for consistency
               />
               <div className="absolute bottom-0 right-0 bg-green-100 rounded-full p-1 border-2 border-white">
                 <Check className="h-5 w-5 text-green-600" />
