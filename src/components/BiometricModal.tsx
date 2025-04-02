@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { 
   Fingerprint, 
@@ -151,8 +150,6 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
             <CameraUI
               onCapture={handleFaceCapture}
               onCancel={() => resetState()}
-              width={400}
-              height={300}
             />
             <p className="text-sm text-gray-600 mt-4">
               Position your face within the frame and ensure good lighting

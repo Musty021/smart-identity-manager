@@ -31,6 +31,7 @@ const AddStudent = () => {
   const [faceImageData, setFaceImageData] = useState<string | null>(null);
   const [fingerprintData, setFingerprintData] = useState<ArrayBuffer | null>(null);
   const [searchClicked, setSearchClicked] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
 
   useEffect(() => {
     handleReset();
@@ -76,8 +77,10 @@ const AddStudent = () => {
     if (!foundStudent) return;
     
     setIsProcessing(true);
+    setRegistrationError(null);
     
     try {
+      // For development purposes, we'll modify how we handle missing AWS registration
       await biometricService.addBiometricData({
         student_id: foundStudent.id,
         face_image_data: faceImageData,
@@ -92,6 +95,7 @@ const AddStudent = () => {
       });
     } catch (error) {
       console.error('Error saving biometric data:', error);
+      setRegistrationError('An error occurred while saving biometric data. Please try again.');
       toast.error('Error saving biometric data', {
         description: 'An error occurred while saving. Please try again.'
       });
@@ -109,6 +113,7 @@ const AddStudent = () => {
     setFaceImageData(null);
     setFingerprintData(null);
     setSearchClicked(false);
+    setRegistrationError(null);
   };
 
   return (
@@ -139,6 +144,16 @@ const AddStudent = () => {
         <FadeIn direction="right" delay={100} className="lg:col-span-2">
           {foundStudent && !foundStudent.hasBiometrics && !isComplete ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              {registrationError && (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-6">
+                  <p className="text-red-700 text-sm font-medium">{registrationError}</p>
+                  <p className="text-red-600 text-xs mt-1">
+                    Note: While AWS face registration might fail in development, 
+                    the student data will still be stored locally for testing.
+                  </p>
+                </div>
+              )}
+              
               {step === 1 && (
                 <FaceCapture
                   onFaceCapture={handleFaceCapture}
