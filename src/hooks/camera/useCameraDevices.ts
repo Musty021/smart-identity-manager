@@ -41,7 +41,10 @@ export function useCameraDevices({ onError }: UseCameraDevicesOptions = {}) {
 
   // Set up device change listener
   useEffect(() => {
-    if (!navigator.mediaDevices) return;
+    if (!navigator.mediaDevices) {
+      handleError('Media devices API not available in this browser');
+      return;
+    }
     
     const handleDeviceChange = async () => {
       console.log('Media devices changed');
@@ -54,15 +57,17 @@ export function useCameraDevices({ onError }: UseCameraDevicesOptions = {}) {
     getVideoDevices();
     
     return () => {
-      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      }
     };
-  }, [getVideoDevices]);
+  }, [getVideoDevices, handleError]);
 
   return {
     devices,
     activeDeviceId,
     setActiveDeviceId,
     getVideoDevices,
-    hasMultipleCameras: devices.length > 1
+    hasMultipleCameras: devices && devices.length > 1
   };
 }

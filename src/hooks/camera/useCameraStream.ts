@@ -50,12 +50,9 @@ export function useCameraStream({ onError }: UseCameraStreamOptions = {}) {
       
       // Set up constraints for camera
       const constraints: MediaStreamConstraints = {
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user',
-          ...(deviceId ? { deviceId: { exact: deviceId } } : {})
-        },
+        video: deviceId 
+          ? { deviceId: { exact: deviceId } }
+          : true,
         audio: false
       };
 
@@ -76,6 +73,20 @@ export function useCameraStream({ onError }: UseCameraStreamOptions = {}) {
       
       // Connect stream to video element
       videoRef.current.srcObject = mediaStream;
+      
+      // Wait for video to be ready
+      videoRef.current.onloadedmetadata = () => {
+        if (videoRef.current) {
+          videoRef.current.play()
+            .then(() => {
+              console.log('Video playback started');
+              setIsReady(true);
+            })
+            .catch(err => {
+              handleError(`Failed to play video: ${err.message}`);
+            });
+        }
+      };
             
       return true;
     } catch (err) {
@@ -83,46 +94,6 @@ export function useCameraStream({ onError }: UseCameraStreamOptions = {}) {
       return false;
     }
   }, [handleError, stopMediaStream]);
-
-  // Monitor video readiness
-  useEffect(() => {
-    if (!videoRef.current || !stream) {
-      setIsReady(false);
-      return;
-    }
-    
-    const video = videoRef.current;
-    
-    const checkVideoReady = () => {
-      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        setIsReady(true);
-      }
-    };
-    
-    // Check immediately
-    checkVideoReady();
-    
-    // Set up event listeners
-    const handleCanPlay = () => {
-      console.log('Video can play event');
-      checkVideoReady();
-    };
-    
-    const handleLoadedMetadata = () => {
-      console.log('Video loaded metadata event');
-      checkVideoReady();
-    };
-    
-    video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    video.addEventListener('loadeddata', checkVideoReady);
-    
-    return () => {
-      video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      video.removeEventListener('loadeddata', checkVideoReady);
-    };
-  }, [stream]);
 
   // Cleanup on unmount
   useEffect(() => {

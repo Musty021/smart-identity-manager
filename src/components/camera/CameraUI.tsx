@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Camera, RotateCw, X, Check, CameraOff, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Camera, RotateCw, X, Check, CameraOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCamera } from '@/hooks/useCamera';
 
@@ -32,7 +32,10 @@ const CameraUI: React.FC<CameraUIProps> = ({
     captureImage,
     hasMultipleCameras
   } = useCamera({
-    onError: () => setMode('error')
+    onError: (errorMsg) => {
+      console.error("Camera error:", errorMsg);
+      setMode('error');
+    }
   });
 
   // Initialize camera on mount or retry
@@ -45,11 +48,15 @@ const CameraUI: React.FC<CameraUIProps> = ({
       if (!mounted) return;
       
       setMode('capturing');
+      console.log("Starting camera...");
       const success = await startCamera();
       if (!mounted) return;
       
       if (!success) {
+        console.error("Failed to start camera");
         setMode('error');
+      } else {
+        console.log("Camera started successfully");
       }
     };
     
@@ -67,6 +74,8 @@ const CameraUI: React.FC<CameraUIProps> = ({
     if (image) {
       setCapturedImage(image);
       setMode('review');
+    } else {
+      console.error("Failed to capture image");
     }
   };
 

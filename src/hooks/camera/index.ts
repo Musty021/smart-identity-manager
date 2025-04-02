@@ -32,7 +32,8 @@ export function useCamera({ onError }: UseCameraOptions = {}) {
     videoRef,
     isReady,
     startCamera,
-    stopCamera
+    stopCamera,
+    stream
   } = useCameraStream({ 
     onError: handleError 
   });
@@ -43,7 +44,7 @@ export function useCamera({ onError }: UseCameraOptions = {}) {
 
   // Switch to another camera
   const switchCamera = useCallback(() => {
-    if (devices.length <= 1) {
+    if (!devices || devices.length <= 1) {
       console.log('Only one camera available, cannot switch');
       return;
     }
@@ -73,7 +74,8 @@ export function useCamera({ onError }: UseCameraOptions = {}) {
     switchCamera,
     captureImage,
     stopCamera,
-    hasMultipleCameras
+    hasMultipleCameras,
+    stream
   };
 }
 
