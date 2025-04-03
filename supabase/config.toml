@@ -30,11 +30,9 @@ enabled = true
 [realtime]
 enabled = true
 
-[edge_functions]
+[functions]
 enabled = true
 
-[vector]
-enabled = true
-
-[functions.face-recognition]
+[[functions.function]]
+name = "face-recognition"
 verify_jwt = false
