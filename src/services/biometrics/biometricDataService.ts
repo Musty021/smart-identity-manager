@@ -69,27 +69,20 @@ export const biometricDataService = {
         fingerprint_template: dataToInsert.fingerprint_template ? '[REDACTED]' : null
       });
       
-      // In a development environment with RLS issues, use the edge function to bypass RLS
-      // This is a workaround for the RLS policy issue
-      const { data: insertedData, error } = await supabase.functions.invoke('face-recognition', {
-        body: {
-          action: 'save-biometric-data',
-          biometricData: dataToInsert
-        }
-      });
+      // Insert data in Supabase with upsert operation
+      const { data, error } = await supabase
+        .from('student_biometrics')
+        .upsert(dataToInsert)
+        .select()
+        .single();
       
       if (error) {
-        console.error('Edge function error when adding biometric data:', error);
+        console.error('Database error when adding biometric data:', error);
         throw error;
       }
       
-      if (!insertedData || !insertedData.success) {
-        console.error('Failed to insert biometric data:', insertedData?.message || 'Unknown error');
-        throw new Error(insertedData?.message || 'Failed to insert biometric data');
-      }
-      
-      console.log('Biometric data added successfully:', insertedData.data);
-      return insertedData.data;
+      console.log('Biometric data added successfully:', data);
+      return data;
     } catch (error) {
       console.error('Error adding biometric data:', error);
       throw error;
@@ -163,26 +156,21 @@ export const biometricDataService = {
         fingerprint_template: dataToUpdate.fingerprint_template ? '[REDACTED]' : undefined
       });
       
-      // In a development environment with RLS issues, use the edge function to bypass RLS
-      const { data: updatedData, error } = await supabase.functions.invoke('face-recognition', {
-        body: {
-          action: 'update-biometric-data',
-          studentId,
-          biometricData: dataToUpdate
-        }
-      });
+      // Update data in Supabase
+      const { data, error } = await supabase
+        .from('student_biometrics')
+        .update(dataToUpdate)
+        .eq('student_id', studentId)
+        .select()
+        .single();
       
       if (error) {
-        console.error('Edge function error when updating biometric data:', error);
+        console.error('Database error when updating biometric data:', error);
         throw error;
       }
       
-      if (!updatedData || !updatedData.success) {
-        console.error('Failed to update biometric data:', updatedData?.message || 'Unknown error');
-        throw new Error(updatedData?.message || 'Failed to update biometric data');
-      }
-      
-      return updatedData.data;
+      console.log('Biometric data updated successfully:', data);
+      return data;
     } catch (error) {
       console.error('Error updating biometric data:', error);
       throw error;
