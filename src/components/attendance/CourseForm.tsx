@@ -3,13 +3,27 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
+import { 
+  Form, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormControl 
+} from '@/components/ui/form';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import FadeIn from '@/components/animations/FadeIn';
 
 export type CourseFormValues = {
   courseName: string;
   courseCode: string;
+  department: string;
 };
 
 interface CourseFormProps {
@@ -21,6 +35,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ onSubmit }) => {
     defaultValues: {
       courseName: '',
       courseCode: '',
+      department: 'Information Technology',
     },
   });
 
@@ -54,6 +69,32 @@ const CourseForm: React.FC<CourseFormProps> = ({ onSubmit }) => {
                     <FormControl>
                       <Input placeholder="e.g. CIT 101" required {...field} />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <Select 
+                      defaultValue={field.value} 
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Information Technology">Information Technology</SelectItem>
+                        <SelectItem value="Computer Science">Computer Science</SelectItem>
+                        <SelectItem value="Software Engineering">Software Engineering</SelectItem>
+                        <SelectItem value="Cyber Security">Cyber Security</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </FormItem>
                 )}
               />

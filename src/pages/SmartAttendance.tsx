@@ -29,6 +29,7 @@ const SmartAttendance = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [students, setStudents] = useState(mockStudents);
   const [currentCourse, setCurrentCourse] = useState('');
+  const [currentDepartment, setCurrentDepartment] = useState('Information Technology');
   const [currentDate, setCurrentDate] = useState(new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -38,6 +39,7 @@ const SmartAttendance = () => {
 
   const handleCourseFormSubmit = (data: CourseFormValues) => {
     setCurrentCourse(`${data.courseCode}: ${data.courseName}`);
+    setCurrentDepartment(data.department);
     setCurrentStep('attendance');
     toast.success('Course details saved. Ready to take attendance.');
   };
@@ -142,6 +144,7 @@ const SmartAttendance = () => {
               totalStudents={students.length}
               presentCount={presentCount}
               absentCount={absentCount}
+              department={currentDepartment}
             />
           </div>
 
