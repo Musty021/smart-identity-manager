@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { 
   Fingerprint, 
@@ -31,8 +32,6 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [faceImageData, setFaceImageData] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
   const handleFaceCapture = useCallback(async (imageSrc: string) => {
     setFaceImageData(imageSrc);
     setStatus('processing');
@@ -59,7 +58,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
     }
   }, [onSuccess]);
 
-  const handleFingerprintVerification = async () => {
+  const handleFingerprintVerification = useCallback(async () => {
     setVerifying('fingerprint');
     setStatus('processing');
     
@@ -91,20 +90,22 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
       setErrorMessage('An error occurred during fingerprint verification. Please try again.');
       toast.error('Verification error. Please try again.');
     }
-  };
+  }, [onSuccess]);
 
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setVerifying(null);
     setStatus('idle');
     setErrorMessage(null);
     setConfidenceScore(null);
     setFaceImageData(null);
-  };
+  }, []);
 
-  const startFaceVerification = () => {
+  const startFaceVerification = useCallback(() => {
     setVerifying('face');
     setStatus('capturing');
-  };
+  }, []);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
