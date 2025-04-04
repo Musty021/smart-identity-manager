@@ -17,6 +17,10 @@ export const biometricService = {
   // Fingerprint verification
   verifyFingerprint: fingerprintService.verifyFingerprint,
   
+  // Direct access to services
+  fingerprintService,
+  faceVerificationService,
+  
   // Biometric data management
   addBiometricData: biometricDataService.addBiometricData,
   updateBiometricData: biometricDataService.updateBiometricData

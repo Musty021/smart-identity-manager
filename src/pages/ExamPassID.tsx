@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { BadgeCheck, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,11 +33,9 @@ const ExamPassID = () => {
     setIsSearching(true);
     
     try {
-      // Get student by registration number using biometric service
       const studentData = await biometricService.getStudentByRegNumber(regNumber);
       
       if (studentData) {
-        // Get student biometric data
         const biometricData = await biometricService.getStudentBiometrics(studentData.id);
         
         if (!biometricData || (!biometricData.has_face && !biometricData.has_fingerprint)) {
@@ -59,7 +56,6 @@ const ExamPassID = () => {
         };
         
         setFoundStudent(student);
-        // Show biometric verification modal
         setShowBiometricModal(true);
       } else {
         toast.error('Student not found', {
@@ -306,6 +302,7 @@ const ExamPassID = () => {
         onSuccess={handleVerificationSuccess}
         title="Identity Verification"
         description="Please verify your identity for exam hall access"
+        studentId={foundStudent?.id}
       />
     </div>
   );

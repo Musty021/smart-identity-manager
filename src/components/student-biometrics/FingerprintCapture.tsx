@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Fingerprint } from 'lucide-react';
+import { toast } from 'sonner';
+import { fingerprintService } from '@/services/biometrics/fingerprintService';
 
 interface FingerprintCaptureProps {
   onFingerprintCapture: () => void;
@@ -18,6 +20,33 @@ const FingerprintCapture: React.FC<FingerprintCaptureProps> = ({
   fingerprintCaptured,
   isProcessing
 }) => {
+  const [captureInProgress, setCaptureInProgress] = useState(false);
+
+  const handleCaptureFingerprint = async () => {
+    setCaptureInProgress(true);
+    
+    try {
+      // Call the fingerprint service to capture fingerprint
+      const result = await fingerprintService.captureFingerprint();
+      
+      if (result.success) {
+        toast.success('Fingerprint captured successfully');
+        onFingerprintCapture();
+      } else {
+        toast.error('Failed to capture fingerprint', {
+          description: 'Please make sure your finger is properly placed on the scanner'
+        });
+      }
+    } catch (error) {
+      console.error('Error capturing fingerprint:', error);
+      toast.error('Error capturing fingerprint', {
+        description: 'An unexpected error occurred. Please try again.'
+      });
+    } finally {
+      setCaptureInProgress(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       <h3 className="text-xl font-semibold text-fud-navy mb-4">Step 2: Fingerprint Capture</h3>
@@ -35,11 +64,11 @@ const FingerprintCapture: React.FC<FingerprintCaptureProps> = ({
               Ensure the student's finger is clean and dry for optimal fingerprint quality
             </p>
             <Button 
-              onClick={onFingerprintCapture}
+              onClick={handleCaptureFingerprint}
               className="bg-fud-green hover:bg-fud-green-dark text-white"
-              disabled={isProcessing}
+              disabled={isProcessing || captureInProgress}
             >
-              {isProcessing ? (
+              {(isProcessing || captureInProgress) ? (
                 <>
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
                   Processing...
@@ -63,7 +92,7 @@ const FingerprintCapture: React.FC<FingerprintCaptureProps> = ({
             </p>
             <Button
               variant="outline"
-              onClick={() => onFingerprintCapture()}
+              onClick={handleCaptureFingerprint}
               className="text-fud-green border-fud-green hover:bg-fud-green/10"
             >
               Retake Fingerprint

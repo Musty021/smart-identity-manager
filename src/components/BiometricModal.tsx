@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { 
   Fingerprint, 
@@ -17,6 +16,7 @@ interface BiometricModalProps {
   onSuccess: (method: 'face' | 'fingerprint', studentId?: string) => void;
   title?: string;
   description?: string;
+  studentId?: string;
 }
 
 const BiometricModal: React.FC<BiometricModalProps> = ({
@@ -24,7 +24,8 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
   onClose,
   onSuccess,
   title = "Biometric Verification",
-  description = "Please verify your identity using one of the following methods:"
+  description = "Please verify your identity using one of the following methods:",
+  studentId
 }) => {
   const [verifying, setVerifying] = useState<'face' | 'fingerprint' | null>(null);
   const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'error'>('idle');
@@ -62,35 +63,41 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
     setVerifying('fingerprint');
     setStatus('processing');
     
-    // In a real implementation, you would:
-    // 1. Capture a fingerprint using a fingerprint scanner
-    // 2. Convert the capture to a template
-    // 3. Send the template to the server for verification
-    
-    // For demo purposes, we'll simulate this process
     try {
-      // Simulate fingerprint capturing and processing
-      setTimeout(async () => {
-        const isSuccess = Math.random() > 0.2; // 80% success rate for demo
-        
-        if (isSuccess) {
-          setStatus('success');
-          setTimeout(() => {
-            onSuccess('fingerprint');
-          }, 1500);
-        } else {
-          setStatus('error');
-          setErrorMessage('Fingerprint verification failed. Please try again or use an alternative method.');
-          toast.error('Verification failed. Fingerprint not recognized.');
+      const captureResult = await biometricService.fingerprintService.captureFingerprint();
+      
+      if (!captureResult.success) {
+        setStatus('error');
+        setErrorMessage('Failed to capture fingerprint. Please ensure your finger is properly placed on the scanner.');
+        toast.error('Fingerprint capture failed. Please try again.');
+        return;
+      }
+      
+      const verifyResult = await biometricService.verifyFingerprint(
+        studentId || 'unknown',
+        captureResult.data || null
+      );
+      
+      if (verifyResult.isMatch) {
+        if (verifyResult.confidence) {
+          setConfidenceScore(verifyResult.confidence);
         }
-      }, 2500);
+        setStatus('success');
+        setTimeout(() => {
+          onSuccess('fingerprint', studentId);
+        }, 1500);
+      } else {
+        setStatus('error');
+        setErrorMessage('Fingerprint verification failed. Please try again or use an alternative method.');
+        toast.error('Verification failed. Fingerprint not recognized.');
+      }
     } catch (error) {
       console.error('Fingerprint verification error:', error);
       setStatus('error');
       setErrorMessage('An error occurred during fingerprint verification. Please try again.');
       toast.error('Verification error. Please try again.');
     }
-  }, [onSuccess]);
+  }, [onSuccess, studentId]);
 
   const resetState = useCallback(() => {
     setVerifying(null);
