@@ -10,13 +10,6 @@ import {
   FormLabel, 
   FormControl 
 } from '@/components/ui/form';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import FadeIn from '@/components/animations/FadeIn';
 
@@ -35,7 +28,7 @@ const CourseForm: React.FC<CourseFormProps> = ({ onSubmit }) => {
     defaultValues: {
       courseName: '',
       courseCode: '',
-      department: 'Information Technology',
+      department: '',
     },
   });
 
@@ -79,22 +72,13 @@ const CourseForm: React.FC<CourseFormProps> = ({ onSubmit }) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Department</FormLabel>
-                    <Select 
-                      defaultValue={field.value} 
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Information Technology">Information Technology</SelectItem>
-                        <SelectItem value="Computer Science">Computer Science</SelectItem>
-                        <SelectItem value="Software Engineering">Software Engineering</SelectItem>
-                        <SelectItem value="Cyber Security">Cyber Security</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g. Information Technology" 
+                        required 
+                        {...field} 
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

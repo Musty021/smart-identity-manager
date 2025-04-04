@@ -29,7 +29,7 @@ const SmartAttendance = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [students, setStudents] = useState(mockStudents);
   const [currentCourse, setCurrentCourse] = useState('');
-  const [currentDepartment, setCurrentDepartment] = useState('Information Technology');
+  const [currentDepartment, setCurrentDepartment] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
