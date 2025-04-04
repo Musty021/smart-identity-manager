@@ -5,10 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 export const studentService = {
   // Get student by registration number
   async getStudentByRegNumber(regNumber: string) {
+    // Convert the input to uppercase for consistency
+    const normalizedRegNumber = regNumber.toUpperCase();
+    
     const { data, error } = await supabase
       .from('fud_students')
       .select('id, name, reg_number, level, department')
-      .eq('reg_number', regNumber)
+      .ilike('reg_number', normalizedRegNumber)
       .single();
     
     if (error) {
@@ -40,9 +43,15 @@ export const studentService = {
     level: string;
     department: string;
   }) {
+    // Convert registration number to uppercase before saving
+    const normalizedStudentData = {
+      ...studentData,
+      reg_number: studentData.reg_number.toUpperCase()
+    };
+    
     const { data, error } = await supabase
       .from('fud_students')
-      .insert(studentData)
+      .insert(normalizedStudentData)
       .select()
       .single();
     

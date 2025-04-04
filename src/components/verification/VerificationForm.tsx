@@ -44,6 +44,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
     
     try {
       // Get student by registration number using biometric service
+      // The service will now handle the case normalization
       const studentData = await biometricService.getStudentByRegNumber(regNumber);
       
       if (studentData) {

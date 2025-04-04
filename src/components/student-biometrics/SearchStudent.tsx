@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AlertCircle, Check, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ const SearchStudent: React.FC<SearchStudentProps> = ({
     setIsProcessing(true);
     
     try {
+      // The service will now handle the case normalization
       const studentData = await biometricService.getStudentByRegNumber(regNumber);
       
       if (studentData) {
