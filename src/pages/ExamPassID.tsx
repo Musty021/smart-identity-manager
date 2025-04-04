@@ -1,60 +1,86 @@
 
 import React, { useState } from 'react';
-import { BadgeCheck, Search, User } from 'lucide-react';
+import { BadgeCheck, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FadeIn from '@/components/animations/FadeIn';
 import BiometricModal from '@/components/BiometricModal';
 import { toast } from 'sonner';
-
-// Mock student data for demonstration
-const mockStudentsDatabase = [
-  { id: 1, name: 'Ahmed Ibrahim', regNumber: 'FUD/19/COM/1001', level: '400', department: 'Computer Science', verified: true },
-  { id: 2, name: 'Fatima Mohammed', regNumber: 'FUD/19/COM/1002', level: '400', department: 'Computer Science', verified: true },
-  { id: 3, name: 'Abubakar Sani', regNumber: 'FUD/19/COM/1003', level: '400', department: 'Computer Science', verified: true },
-  { id: 4, name: 'Zainab Yusuf', regNumber: 'FUD/19/COM/1004', level: '400', department: 'Computer Science', verified: true },
-  { id: 5, name: 'Ibrahim Hassan', regNumber: 'FUD/19/COM/1005', level: '400', department: 'Computer Science', verified: true },
-];
+import { biometricService } from '@/services/biometricService';
 
 const ExamPassID = () => {
   const [showBiometricModal, setShowBiometricModal] = useState(false);
   const [regNumber, setRegNumber] = useState('');
   const [searchClicked, setSearchClicked] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [foundStudent, setFoundStudent] = useState<{
+    id?: string;
     name: string;
     regNumber: string;
     level: string;
     department: string;
+    photo: string;
   } | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState<'face' | 'fingerprint' | null>(null);
+  const [verificationTime, setVerificationTime] = useState<string | null>(null);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!regNumber) {
       toast.error('Please enter a registration number');
       return;
     }
     
     setSearchClicked(true);
-    const student = mockStudentsDatabase.find(s => s.regNumber === regNumber);
+    setIsSearching(true);
     
-    if (student) {
-      setFoundStudent({
-        name: student.name,
-        regNumber: student.regNumber,
-        level: student.level,
-        department: student.department
+    try {
+      // Get student by registration number using biometric service
+      const studentData = await biometricService.getStudentByRegNumber(regNumber);
+      
+      if (studentData) {
+        // Get student biometric data
+        const biometricData = await biometricService.getStudentBiometrics(studentData.id);
+        
+        if (!biometricData || (!biometricData.has_face && !biometricData.has_fingerprint)) {
+          toast.error('Biometric data not found for this student', {
+            description: 'Student exists but has no biometric data registered'
+          });
+          setIsSearching(false);
+          return;
+        }
+        
+        const student = {
+          id: studentData.id,
+          name: studentData.name,
+          regNumber: studentData.reg_number,
+          level: studentData.level,
+          department: studentData.department,
+          photo: biometricData?.face_image_url || 'https://i.pravatar.cc/150?img=1'
+        };
+        
+        setFoundStudent(student);
+        // Show biometric verification modal
+        setShowBiometricModal(true);
+      } else {
+        toast.error('Student not found', {
+          description: 'No student with this registration number exists in our records'
+        });
+      }
+    } catch (error) {
+      console.error('Error searching for student:', error);
+      toast.error('Error searching for student', {
+        description: 'An error occurred while searching. Please try again.'
       });
-      setShowBiometricModal(true);
-    } else {
-      setFoundStudent(null);
-      toast.error('Student not found', {
-        description: 'No student with this registration number exists in our records'
-      });
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const handleVerificationSuccess = (method: 'face' | 'fingerprint') => {
+  const handleVerificationSuccess = (method: 'face' | 'fingerprint', studentId?: string) => {
     setShowBiometricModal(false);
     setIsVerified(true);
+    setVerificationMethod(method);
+    setVerificationTime(new Date().toLocaleTimeString());
     
     toast.success('Identity verified successfully', {
       description: `Verified using ${method === 'face' ? 'Face ID' : 'Fingerprint'}`
@@ -66,6 +92,8 @@ const ExamPassID = () => {
     setSearchClicked(false);
     setFoundStudent(null);
     setIsVerified(false);
+    setVerificationMethod(null);
+    setVerificationTime(null);
   };
 
   return (
@@ -92,17 +120,28 @@ const ExamPassID = () => {
                 <input
                   id="regNumber"
                   type="text"
-                  placeholder="e.g. FUD/19/COM/1001"
+                  placeholder="e.g. FCP/CIT/22/1001"
                   value={regNumber}
                   onChange={(e) => setRegNumber(e.target.value)}
                   className="input-style flex-1"
+                  disabled={isSearching}
                 />
                 <Button 
                   onClick={handleSearch}
                   className="bg-fud-green hover:bg-fud-green-dark text-white px-4"
+                  disabled={isSearching}
                 >
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
+                  {isSearching ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Search
+                    </>
+                  )}
                 </Button>
               </div>
               <p className="text-sm text-gray-500 mt-2">
@@ -110,7 +149,7 @@ const ExamPassID = () => {
               </p>
             </div>
             
-            {searchClicked && !foundStudent && (
+            {searchClicked && !foundStudent && !isSearching && (
               <div className="p-4 rounded-lg bg-red-50 border border-red-100 mb-6">
                 <p className="text-red-700 font-medium">
                   No student found with the provided registration number.
@@ -128,6 +167,21 @@ const ExamPassID = () => {
                     <BadgeCheck className="h-5 w-5 text-green-600" />
                   </div>
                   <h3 className="text-lg font-medium text-green-800">Identity Verified</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Verification Method</p>
+                    <p className="text-sm font-medium text-green-700">
+                      {verificationMethod === 'face' ? 'Face ID' : 'Fingerprint'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Verification Time</p>
+                    <p className="text-sm font-medium text-green-700">
+                      {verificationTime}
+                    </p>
+                  </div>
                 </div>
                 
                 <p className="text-green-700 mb-4">
@@ -154,8 +208,12 @@ const ExamPassID = () => {
               </div>
               
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-full bg-fud-green/10 flex items-center justify-center">
-                  <User className="h-8 w-8 text-fud-green" />
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-green-200">
+                  <img 
+                    src={foundStudent.photo} 
+                    alt={foundStudent.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-fud-navy">{foundStudent.name}</h3>
