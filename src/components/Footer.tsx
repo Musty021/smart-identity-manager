@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -80,7 +79,7 @@ const Footer: React.FC = () => {
 
         <div className="mt-10 pt-6 border-t border-gray-700 text-center text-sm text-gray-400">
           <p className="flex items-center justify-center gap-1">
-            Created with <Heart size={14} className="text-red-400" /> for Federal University Dutse
+            Created for Federal University Dutse <Heart size={14} className="text-red-400" />
           </p>
           <p className="mt-1">© {new Date().getFullYear()} Virtual Student's ID. All rights reserved.</p>
         </div>
