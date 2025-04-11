@@ -32,15 +32,15 @@ const Header: React.FC = () => {
       <div className="container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
           <img 
-            src="/lovable-uploads/39129dbf-f2c1-40e3-87f2-7f0c5879a17e.png" 
-            alt="Virtual Student's ID" 
+            src="/lovable-uploads/58c433f3-3bbe-4692-90eb-671930da0b9e.png" 
+            alt="Students Virtual ID" 
             className="h-10 w-auto" 
           />
           <span className={cn(
             "font-semibold text-lg transition-colors duration-300",
             isScrolled ? "text-fud-navy" : "text-fud-navy"
           )}>
-            Virtual Student's ID
+            Students Virtual ID
           </span>
         </Link>
       </div>

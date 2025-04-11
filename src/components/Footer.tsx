@@ -5,8 +5,7 @@ import {
   UserCheck, 
   ShieldCheck, 
   UserPlus, 
-  School,
-  Heart
+  School 
 } from 'lucide-react';
 
 const Footer: React.FC = () => {
@@ -17,11 +16,11 @@ const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <img 
-                src="/lovable-uploads/39129dbf-f2c1-40e3-87f2-7f0c5879a17e.png" 
-                alt="Virtual Student's ID" 
+                src="/lovable-uploads/58c433f3-3bbe-4692-90eb-671930da0b9e.png" 
+                alt="Students Virtual ID" 
                 className="h-10 w-auto brightness-200" 
               />
-              <h3 className="text-xl font-semibold">Virtual Student's ID</h3>
+              <h3 className="text-xl font-semibold">Students Virtual ID</h3>
             </div>
             <p className="text-sm text-gray-300 max-w-sm">
               Revolutionizing student identification and attendance with cutting-edge biometric verification technology.
@@ -79,7 +78,7 @@ const Footer: React.FC = () => {
 
         <div className="mt-10 pt-6 border-t border-gray-700 text-center text-sm text-gray-400">
           <p>Created for Federal University Dutse</p>
-          <p className="mt-1">© {new Date().getFullYear()} Virtual Student's ID. All rights reserved.</p>
+          <p className="mt-1">© {new Date().getFullYear()} Students Virtual ID. All rights reserved.</p>
         </div>
       </div>
     </footer>
