@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import FeatureCard from '@/components/FeatureCard';
@@ -48,8 +47,8 @@ const Index = () => {
                 <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-fud-navy/5 rounded-full animate-pulse-soft"></div>
                 <div className="glassmorphism rounded-2xl overflow-hidden p-6 relative z-10">
                   <img 
-                    src="/lovable-uploads/39129dbf-f2c1-40e3-87f2-7f0c5879a17e.png" 
-                    alt="Virtual Student's ID" 
+                    src="/lovable-uploads/4a3b26f7-2ed1-4ad5-9fc4-e924dc6c3433.png" 
+                    alt="Students Virtual ID" 
                     className="w-full h-auto object-contain" 
                   />
                 </div>
