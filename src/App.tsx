@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +12,6 @@ import VerifyMe from "./pages/VerifyMe";
 import AddStudent from "./pages/AddStudent";
 import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
-import Presentation from "./pages/Presentation";
 
 const queryClient = new QueryClient();
 
@@ -30,7 +30,6 @@ function App() {
               <Route path="/smart-attendance" element={<Layout><SmartAttendance /></Layout>} />
               <Route path="/exam-pass" element={<Layout><ExamPassID /></Layout>} />
               <Route path="/get-started" element={<Layout><GetStarted /></Layout>} />
-              <Route path="/presentation" element={<Presentation />} />
               <Route path="*" element={<Layout><NotFound /></Layout>} />
             </Routes>
           </BrowserRouter>

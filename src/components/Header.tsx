@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Menu, X, Presentation } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const Header: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -42,19 +42,6 @@ const Header: React.FC = () => {
           )}>
             Students Virtual ID
           </span>
-        </Link>
-        
-        <Link 
-          to="/presentation" 
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg transition-all",
-            isScrolled 
-              ? "bg-fud-green/10 text-fud-green hover:bg-fud-green/20" 
-              : "bg-white/20 text-fud-navy backdrop-blur-sm hover:bg-white/30"
-          )}
-        >
-          <Presentation className="h-4 w-4" />
-          <span className="font-medium">Presentation</span>
         </Link>
       </div>
     </header>
