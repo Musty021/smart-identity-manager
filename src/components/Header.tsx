@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Menu, X, Slideshow } from 'lucide-react';
+import { Menu, X, Presentation } from 'lucide-react';
 
 const Header: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -53,7 +53,7 @@ const Header: React.FC = () => {
               : "bg-white/20 text-fud-navy backdrop-blur-sm hover:bg-white/30"
           )}
         >
-          <Slideshow className="h-4 w-4" />
+          <Presentation className="h-4 w-4" />
           <span className="font-medium">Presentation</span>
         </Link>
       </div>
