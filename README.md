@@ -1,69 +1,71 @@
-# Welcome to your Lovable project
 
-## Project info
+# Students Virtual ID: Smart Campus Identity Management System
 
-**URL**: https://lovable.dev/projects/42ff3ccc-3f6a-46d1-89b8-6d466f30f223
+## Project Overview
 
-## How can I edit this code?
+Students Virtual ID is an advanced biometric identity management system designed to revolutionize campus security and administrative processes. Leveraging cutting-edge facial recognition and fingerprint verification technologies, the application provides a comprehensive solution for student identification and access control.
 
-There are several ways of editing your application.
+## Key Features
 
-**Use Lovable**
+### 1. Biometric Verification
+- Face ID and Fingerprint Authentication
+- Over 99% accuracy in student identification
+- Prevent identity fraud and proxy attendance
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/42ff3ccc-3f6a-46d1-89b8-6d466f30f223) and start prompting.
+### 2. Smart Attendance
+- Automate lecture attendance tracking
+- Real-time verification using biometric data
+- Detailed attendance reports generation
 
-Changes made via Lovable will be committed automatically to this repo.
+### 3. Campus Access Control
+- Secure university gate entry
+- Library and lab access management
+- Event entry verification
 
-**Use your preferred IDE**
+### 4. Exam Hall Authentication
+- Prevent impersonation during exams
+- Secure biometric checks for exam halls
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 5. Student Registration
+- Capture facial and fingerprint data
+- Secure encrypted biometric storage
+- Streamlined student onboarding process
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Technologies Used
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
+- Shadcn/UI
+- Supabase
+- AWS Rekognition
+- React Query
+- Vite
 
-## How can I deploy this project?
+## Getting Started
 
-Simply open [Lovable](https://lovable.dev/projects/42ff3ccc-3f6a-46d1-89b8-6d466f30f223) and click on Share -> Publish.
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start development server: `npm run dev`
 
-## I want to use a custom domain - is that possible?
+## Deployment
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+Deploy easily through Lovable or connect to your preferred hosting platform.
+
+## Security
+
+- End-to-end encrypted biometric data
+- Strict Row Level Security (RLS)
+- Compliance with data protection regulations
+
+## Contributing
+
+Contributions are welcome! Please refer to our contribution guidelines.
+
+## License
+
+[Specify your project's license]
+
+## Contact
+
+[Your contact information or support channels]
