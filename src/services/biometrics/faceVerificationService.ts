@@ -39,7 +39,7 @@ export const faceVerificationService = {
       
       // Check if face was matched
       if (result.matched && result.confidence) {
-        const minimumThreshold = 80; // 80% confidence threshold
+        const minimumThreshold = 70; // Lower threshold to 70% confidence
         console.log(`Face matched with confidence: ${result.confidence}%, threshold: ${minimumThreshold}%`);
         
         if (result.confidence >= minimumThreshold) {

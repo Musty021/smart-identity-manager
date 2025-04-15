@@ -30,6 +30,7 @@ export const awsFaceService = {
   // Register a face with AWS Rekognition
   async registerFace(studentId: string, imageData: string): Promise<FaceRegistrationResponse> {
     try {
+      console.log('Sending face registration request to edge function');
       const { data, error } = await supabase.functions.invoke('face-recognition', {
         body: {
           action: 'register-face',
@@ -47,13 +48,14 @@ export const awsFaceService = {
         };
       }
 
+      console.log('Face registration response:', data);
       return data as FaceRegistrationResponse;
     } catch (error) {
       console.error('Error in registerFace:', error);
       return {
         success: false,
         message: 'An unexpected error occurred during face registration',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   },
@@ -61,6 +63,7 @@ export const awsFaceService = {
   // Verify a face against AWS Rekognition collection
   async verifyFace(imageData: string): Promise<FaceVerificationResponse> {
     try {
+      console.log('Sending face verification request to edge function');
       const { data, error } = await supabase.functions.invoke('face-recognition', {
         body: {
           action: 'verify-face',
@@ -77,13 +80,14 @@ export const awsFaceService = {
         };
       }
 
+      console.log('Face verification response:', data);
       return data as FaceVerificationResponse;
     } catch (error) {
       console.error('Error in verifyFace:', error);
       return {
         success: false,
         message: 'An unexpected error occurred during face verification',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   },
