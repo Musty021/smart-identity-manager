@@ -1,10 +1,12 @@
+
 import React, { useState, useCallback } from 'react';
 import { 
   Fingerprint, 
   Scan, 
   Check, 
   AlertCircle, 
-  Loader2 
+  Loader2,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { biometricService } from '@/services/biometricService';
@@ -30,12 +32,16 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
   const [verifying, setVerifying] = useState<'face' | 'fingerprint' | null>(null);
   const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [faceImageData, setFaceImageData] = useState<string | null>(null);
+  const [verificationAttempts, setVerificationAttempts] = useState(0);
 
   const handleFaceCapture = useCallback(async (imageSrc: string) => {
     setFaceImageData(imageSrc);
     setStatus('processing');
+    setErrorMessage(null);
+    setErrorDetails(null);
     
     try {
       const result = await biometricService.verifyFace(imageSrc);
@@ -43,33 +49,61 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
       if (result.isMatch) {
         setConfidenceScore(result.confidence || null);
         setStatus('success');
+        toast.success('Identity verified successfully', {
+          description: `Confidence: ${result.confidence?.toFixed(1)}%`
+        });
         setTimeout(() => {
           onSuccess('face', result.student?.id);
         }, 1500);
       } else {
         setStatus('error');
-        setErrorMessage('Face verification failed. Your face does not match any registered faces in our system.');
-        toast.error('Verification failed. Face not recognized.');
+        setVerificationAttempts(prev => prev + 1);
+        
+        if (result.error?.includes('confidence too low') && result.confidence) {
+          setConfidenceScore(result.confidence);
+          setErrorMessage('Verification failed due to low confidence score.');
+          setErrorDetails('Your face was recognized but with low confidence. Please try again with better lighting and a clear view of your face.');
+        } else if (result.error?.includes('No matching face')) {
+          setErrorMessage('Face not recognized.');
+          setErrorDetails('Your face could not be matched with any registered face in our system. Please try again or contact administrator if problem persists.');
+        } else {
+          setErrorMessage('Face verification failed.');
+          setErrorDetails(result.error || 'An unknown error occurred during verification.');
+        }
+        
+        toast.error('Verification failed', {
+          description: result.error || 'Face not recognized'
+        });
       }
     } catch (error) {
       console.error('Face verification error:', error);
       setStatus('error');
-      setErrorMessage('An error occurred during face verification. Please try again.');
-      toast.error('Verification error. Please try again.');
+      setVerificationAttempts(prev => prev + 1);
+      setErrorMessage('An error occurred during face verification.');
+      setErrorDetails(error instanceof Error ? error.message : 'Unknown error');
+      toast.error('Verification error', {
+        description: 'Please try again or use another method'
+      });
     }
   }, [onSuccess]);
 
   const handleFingerprintVerification = useCallback(async () => {
     setVerifying('fingerprint');
     setStatus('processing');
+    setErrorMessage(null);
+    setErrorDetails(null);
     
     try {
       const captureResult = await biometricService.fingerprintService.captureFingerprint();
       
       if (!captureResult.success) {
         setStatus('error');
-        setErrorMessage('Failed to capture fingerprint. Please ensure your finger is properly placed on the scanner.');
-        toast.error('Fingerprint capture failed. Please try again.');
+        setVerificationAttempts(prev => prev + 1);
+        setErrorMessage('Failed to capture fingerprint.');
+        setErrorDetails('Please ensure your finger is properly placed on the scanner and try again.');
+        toast.error('Fingerprint capture failed', {
+          description: 'Please try again'
+        });
         return;
       }
       
@@ -83,19 +117,28 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
           setConfidenceScore(verifyResult.confidence);
         }
         setStatus('success');
+        toast.success('Identity verified successfully');
         setTimeout(() => {
           onSuccess('fingerprint', studentId);
         }, 1500);
       } else {
         setStatus('error');
-        setErrorMessage('Fingerprint verification failed. Please try again or use an alternative method.');
-        toast.error('Verification failed. Fingerprint not recognized.');
+        setVerificationAttempts(prev => prev + 1);
+        setErrorMessage('Fingerprint verification failed.');
+        setErrorDetails('Your fingerprint did not match our records. Please try again or use face verification.');
+        toast.error('Verification failed', {
+          description: 'Fingerprint not recognized'
+        });
       }
     } catch (error) {
       console.error('Fingerprint verification error:', error);
       setStatus('error');
-      setErrorMessage('An error occurred during fingerprint verification. Please try again.');
-      toast.error('Verification error. Please try again.');
+      setVerificationAttempts(prev => prev + 1);
+      setErrorMessage('An error occurred during fingerprint verification.');
+      setErrorDetails(error instanceof Error ? error.message : 'Unknown error');
+      toast.error('Verification error', {
+        description: 'Please try again or use another method'
+      });
     }
   }, [onSuccess, studentId]);
 
@@ -103,6 +146,7 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
     setVerifying(null);
     setStatus('idle');
     setErrorMessage(null);
+    setErrorDetails(null);
     setConfidenceScore(null);
     setFaceImageData(null);
   }, []);
@@ -207,15 +251,40 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
             </p>
 
             {confidenceScore !== null && (
-              <p className="text-sm font-medium text-fud-green mb-6">
+              <p className="text-sm font-medium text-fud-green mb-2">
                 Match confidence: {confidenceScore.toFixed(1)}%
               </p>
+            )}
+
+            {status === 'error' && errorDetails && (
+              <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-red-700 flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
+                <p>{errorDetails}</p>
+              </div>
+            )}
+
+            {verificationAttempts >= 3 && status === 'error' && (
+              <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3 mb-4 text-sm text-yellow-800">
+                <p className="font-medium">Having trouble?</p>
+                <ul className="list-disc pl-5 mt-1 text-xs">
+                  <li>Make sure your face is well-lit and clearly visible</li>
+                  <li>Remove any facial coverings or accessories</li>
+                  <li>Try a different verification method</li>
+                  <li>Contact system administrator if problems persist</li>
+                </ul>
+              </div>
             )}
 
             {status === 'error' && (
               <div className="flex gap-3">
                 <button
-                  onClick={resetState}
+                  onClick={() => {
+                    if (verifying === 'face') {
+                      startFaceVerification();
+                    } else {
+                      handleFingerprintVerification();
+                    }
+                  }}
                   className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-medium transition-colors hover:bg-gray-200"
                 >
                   Try Again
@@ -223,11 +292,10 @@ const BiometricModal: React.FC<BiometricModalProps> = ({
                 <button
                   onClick={() => {
                     resetState();
-                    onClose();
                   }}
                   className="px-4 py-2 bg-fud-green text-white rounded-lg text-sm font-medium transition-colors hover:bg-fud-green-dark"
                 >
-                  Cancel
+                  Switch Method
                 </button>
               </div>
             )}
