@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, ImageOff, AlertCircle, Check } from 'lucide-react';
+import { Camera, ImageOff, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -15,18 +15,60 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [captureQuality, setCaptureQuality] = useState<'poor' | 'good' | 'excellent' | null>(null);
+  const [cameraDevice, setCameraDevice] = useState<MediaDeviceInfo | null>(null);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const { toast } = useToast();
+  
+  const getAvailableCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(cameras);
+      
+      // Try to select front camera if available (for mobile devices)
+      const frontCamera = cameras.find(camera => 
+        camera.label.toLowerCase().includes('front') || 
+        camera.label.toLowerCase().includes('user')
+      );
+      
+      if (frontCamera) {
+        setCameraDevice(frontCamera);
+      } else if (cameras.length > 0) {
+        setCameraDevice(cameras[0]);
+      }
+      
+      return cameras.length > 0;
+    } catch (err) {
+      console.error('Error getting cameras:', err);
+      return false;
+    }
+  };
   
   const startCamera = async () => {
     setCameraError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+      // Make sure we have cameras available
+      if (availableCameras.length === 0) {
+        const hasCamera = await getAvailableCameras();
+        if (!hasCamera) {
+          throw new Error("No cameras detected on your device");
         }
-      });
+      }
+      
+      // Set constraints for camera - try to use selected device or fallback
+      const constraints: MediaStreamConstraints = {
+        video: cameraDevice ? 
+          { deviceId: { exact: cameraDevice.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : 
+          { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      };
+      
+      // Stop any existing stream
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -35,14 +77,43 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
         // Start face detection once camera is active
         setTimeout(checkFaceVisibility, 1000);
       }
+      
+      console.log("Camera started successfully");
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setCameraError("Couldn't access your camera. Please check permissions.");
+      setCameraError(`Couldn't access your camera: ${err instanceof Error ? err.message : 'Unknown error'}`);
       toast({
         variant: "destructive",
         title: "Camera Access Error",
         description: "We couldn't access your camera. Please check your browser permissions."
       });
+    }
+  };
+  
+  const switchCamera = async () => {
+    if (availableCameras.length <= 1) {
+      toast({
+        title: "No Alternative Cameras",
+        description: "No other cameras found on your device"
+      });
+      return;
+    }
+    
+    // Get current camera index
+    const currentIndex = availableCameras.findIndex(
+      camera => cameraDevice && camera.deviceId === cameraDevice.deviceId
+    );
+    
+    // Select next camera in the list
+    const nextIndex = (currentIndex + 1) % availableCameras.length;
+    setCameraDevice(availableCameras[nextIndex]);
+    
+    // Restart camera with new device
+    if (isCameraActive) {
+      stopCamera();
+      setTimeout(() => {
+        startCamera();
+      }, 300);
     }
   };
   
@@ -75,6 +146,59 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
     return brightness / (data.length / 4);
   };
   
+  // Function to detect face-like patterns in the video
+  const detectFacePattern = (canvas: HTMLCanvasElement) => {
+    const context = canvas.getContext('2d');
+    if (!context) return false;
+    
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // Define the center area where we expect the face to be
+    const centerX = Math.floor(width / 2);
+    const centerY = Math.floor(height / 2);
+    const checkRadius = Math.min(width, height) / 4;
+    
+    // Analyze the center area for skin-tone-like pixels
+    let skinTonePixels = 0;
+    let totalPixels = 0;
+    
+    for (let y = centerY - checkRadius; y < centerY + checkRadius; y += 4) {
+      if (y < 0 || y >= height) continue;
+      
+      for (let x = centerX - checkRadius; x < centerX + checkRadius; x += 4) {
+        if (x < 0 || x >= width) continue;
+        
+        const idx = (y * width + x) * 4;
+        
+        // Skip if out of bounds
+        if (idx >= data.length - 4) continue;
+        
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        // Very simple skin tone detection
+        // More accurate methods would use machine learning models
+        if (r > 60 && g > 40 && b > 30 && // Lower bounds for skin tones
+            r > g && r > b && // Red channel should be the highest
+            Math.abs(r - g) > 15) { // Some distance between red and green
+          skinTonePixels++;
+        }
+        
+        totalPixels++;
+      }
+    }
+    
+    // Calculate the percentage of skin tone pixels
+    const skinToneRatio = totalPixels > 0 ? skinTonePixels / totalPixels : 0;
+    
+    // Consider if there's a certain percentage of skin tone pixels as a face
+    return skinToneRatio > 0.15; // Threshold can be adjusted
+  };
+  
   // Function to detect face in the video
   const checkFaceVisibility = () => {
     if (!videoRef.current || !canvasRef.current || !isCameraActive) return;
@@ -99,12 +223,17 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
     // Analyze brightness
     const brightness = analyzeBrightness(canvas);
     
-    // Simple face detection based on brightness and image area coverage
-    // In a production app, you would use a proper face detection library or API
-    if (brightness > 50) {
-      // Brightness is good, assume face is visible
-      setIsFaceDetected(true);
-      
+    // Check for face-like pattern
+    const hasFacePattern = detectFacePattern(canvas);
+    
+    console.log('Face detection check - Brightness:', brightness, 'Face pattern detected:', hasFacePattern);
+    
+    // Determine if a face is likely present based on both brightness and pattern
+    const likelyHasFace = brightness > 50 && hasFacePattern;
+    setIsFaceDetected(likelyHasFace);
+    
+    // Set quality based on brightness
+    if (likelyHasFace) {
       if (brightness > 100) {
         setCaptureQuality('excellent');
       } else if (brightness > 70) {
@@ -113,7 +242,6 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
         setCaptureQuality('poor');
       }
     } else {
-      setIsFaceDetected(false);
       setCaptureQuality(null);
     }
     
@@ -146,7 +274,10 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
     }
   };
   
+  // Initialize camera devices on component mount
   useEffect(() => {
+    getAvailableCameras();
+    
     return () => {
       stopCamera();
     };
@@ -241,6 +372,18 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
           >
             {!isFaceDetected ? 'Waiting for face...' : 'Take Photo'}
           </Button>
+          
+          {availableCameras.length > 1 && (
+            <Button
+              onClick={switchCamera}
+              variant="outline"
+              className="px-3"
+              title="Switch Camera"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </Button>
+          )}
+          
           <Button
             onClick={stopCamera}
             variant="outline"
