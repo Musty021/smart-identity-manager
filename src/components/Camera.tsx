@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, ImageOff, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,9 +5,10 @@ import { useToast } from '@/components/ui/use-toast';
 
 interface CameraComponentProps {
   onCapture: (image: string) => void;
+  onError?: (error: string) => void;
 }
 
-const CameraComponent = ({ onCapture }: CameraComponentProps) => {
+const CameraComponent = ({ onCapture, onError }: CameraComponentProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -81,7 +81,14 @@ const CameraComponent = ({ onCapture }: CameraComponentProps) => {
       console.log("Camera started successfully");
     } catch (err) {
       console.error('Error accessing camera:', err);
-      setCameraError(`Couldn't access your camera: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const errorMessage = `Couldn't access your camera: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      setCameraError(errorMessage);
+      
+      // Call the onError prop if provided
+      if (onError) {
+        onError(errorMessage);
+      }
+      
       toast({
         variant: "destructive",
         title: "Camera Access Error",
