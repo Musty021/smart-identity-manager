@@ -9,7 +9,7 @@ import Index from "./pages/Index";
 import SmartAttendance from "./pages/SmartAttendance";
 import ExamPassID from "./pages/ExamPassID";
 import VerifyMe from "./pages/VerifyMe";
-import AddMember from "./pages/AddMember";
+import AddStudent from "./pages/AddStudent";
 import NotFound from "./pages/NotFound";
 import GetStarted from "./pages/GetStarted";
 
@@ -26,7 +26,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Layout><Index /></Layout>} />
               <Route path="/verify-me" element={<Layout><VerifyMe /></Layout>} />
-              <Route path="/add-member" element={<Layout><AddMember /></Layout>} />
+              <Route path="/add-student" element={<Layout><AddStudent /></Layout>} />
               <Route path="/smart-attendance" element={<Layout><SmartAttendance /></Layout>} />
               <Route path="/exam-pass" element={<Layout><ExamPassID /></Layout>} />
               <Route path="/get-started" element={<Layout><GetStarted /></Layout>} />

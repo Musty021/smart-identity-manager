@@ -51,7 +51,7 @@ async function callAWSAPI(path: string, method: string, body: object) {
     const dateStamp = date.slice(0, 8);
     const service = 'rekognition';
     
-    const headers: Record<string, string> = {
+    const headers = {
       'X-Amz-Date': date,
       'X-Amz-Target': `RekognitionService.${path.split('/').pop()}`,
       'Content-Type': 'application/x-amz-json-1.1',
@@ -214,7 +214,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({
               success: false,
-              message: `Face registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+              message: `Face registration failed: ${error.message}`
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -307,7 +307,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({
               success: false,
-              message: `Face verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+              message: `Face verification failed: ${error.message}`
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -365,7 +365,7 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({
               success: false,
-              message: `Face deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+              message: `Face deletion failed: ${error.message}`
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -393,7 +393,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         message: 'Internal server error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
